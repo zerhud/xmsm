@@ -1,2 +1,2 @@
 # xmsm
-meta finite state automaton
+extended meta finite state automaton
