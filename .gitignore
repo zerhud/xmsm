@@ -34,3 +34,4 @@
 # developing aftefacts
 .idea/*
 clion_build/*
+make_build/*

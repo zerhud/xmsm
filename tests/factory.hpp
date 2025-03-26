@@ -10,15 +10,27 @@
 
 #include "xmsm.hpp"
 
+#include <vector>
 #include <variant>
 
 namespace tests {
 
 struct factory {
-  template<typename... types> using variant_t = std::variant<types...>;
 };
 
-template<auto v> struct state { constexpr static auto val = v; };
-template<auto v> struct event { constexpr static auto val = v; };
+template<typename... types> constexpr auto mk_variant(const factory&) {
+  return std::variant<types...>{};
+}
+template<typename type> constexpr auto mk_list(const factory&) {
+  auto ret = std::vector<type>{};
+  ret.reserve(1000); // we can't use std::list in constexpr context, and the vector shouldn't move elements
+  return ret;
+}
+constexpr void erase(const factory&, auto& cnt, auto ind) {
+  cnt.erase(cnt.begin() + ind);
+}
+
+template<auto v> struct state { constexpr static auto val = v; int rt_val{0}; };
+template<auto v> struct event { constexpr static auto val = v; int rt_val{0}; };
 
 }

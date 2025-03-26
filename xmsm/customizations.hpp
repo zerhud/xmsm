@@ -23,6 +23,15 @@ template<typename type> constexpr auto& variant_emplace(const auto& f, auto& v, 
   else return v.template emplace<type>(static_cast<type&&>(next));
 }
 
+constexpr auto& empace_back(auto& obj, auto&& v) {
+  if constexpr(requires{emplace_back(obj, std::move(v));}) return emplace_back(obj, std::move(v));
+  else if constexpr(requires{obj.emplace_back(std::move(v));}) return obj.emplace_back(std::move(v));
+  else return obj.push_back(std::move(v));
+}
+constexpr void pop_back(auto& obj) {
+  obj.pop_back();
+}
+
 template<typename type> constexpr auto create_state(const auto& f) {
   if constexpr(requires{create<type>(f);}) return create<type>(f);
   else if constexpr(requires{Create<type>(f);}) return Create<type>(f);
