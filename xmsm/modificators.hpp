@@ -17,6 +17,11 @@ template<typename e, typename... tail> struct stack_by_event {
   constexpr static auto back_events = (type_list<e>{} << ... << type_c<tail>) ;
 };
 
+template<typename e> struct stack_by_expression {
+  constexpr static bool is_stack_by_expression = true;
+  constexpr static auto expression = type_c<e>;
+};
+
 template<typename type> struct def_state {
   constexpr static bool is_def_state = true;
   constexpr static auto st = type_c<type>;

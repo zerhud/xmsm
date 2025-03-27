@@ -18,6 +18,10 @@ static_assert( name<tests::factory>(xmsm::type_c<foo>) == "foo"sv );
 static_assert( name<tests::factory>(xmsm::type_c<test::t::t::bar<3>>) == "test::t::t::bar<3>"sv );
 static_assert( hash<tests::factory>(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool" );
 
+static_assert( xmsm::type_c<foo> == xmsm::type_c<foo> );
+static_assert( xmsm::type_c<int> != xmsm::type_c<foo> );
+static_assert( xmsm::type_c<decltype(xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<>)> == xmsm::type_c<xmsm::type_list<int>> );
+
 int main(int,char**){
   std::cout << "hash42(foo) == |" << hash64<tests::factory>(xmsm::type_c<foo>) << '|' << std::endl;
 }

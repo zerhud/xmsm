@@ -32,7 +32,7 @@ template<typename type, typename... items> constexpr bool contains(const type_li
 template<typename... l, typename r> constexpr auto operator+(const type_list<l...>&, _type_c<r>) { return type_list<l..., r>{}; }
 template<typename... l, typename... r> constexpr auto operator+(const type_list<l...>&, const type_list<r...>&) { return type_list<l..., r...>{}; }
 template<typename... items, typename type> constexpr auto operator<<(const type_list<items...>& l, _type_c<type> t) {
-  if constexpr (contains(l, t) || t == type_c<>) return l;
+  if constexpr (t == type_c<> || contains(l, t)) return l;
   else return type_list<items..., type>{};
 }
 template<typename... left, typename... right> constexpr auto operator<<(const type_list<left...>&, const type_list<right...>&) {
