@@ -31,7 +31,7 @@ struct trans_info {
 template<typename state, auto max_event_count>
 struct stack_frame {
   state st;
-  int back_event_non_zero_inds[max_event_count] = {};
+  uint32_t back_event_non_zero_ids[max_event_count] = {};
 };
 
 struct fake_stack{ constexpr explicit fake_stack(const auto&){} };
@@ -112,15 +112,15 @@ struct scenario {
   constexpr static auto events_count() { return size(all_events()); }
 private:
   constexpr auto clean_stack(const auto& e) /* pre(contains(all_events(), type_dc<decltype(e)>)) */ {
-    auto ind = index_of(all_events(), type_dc<decltype(e)>) + 1;
+    auto ind = hash<factory>(find(all_events(), type_dc<decltype(e)>));
     // contract_assert( ind >= 0 );
     auto check_contains = []<auto sz>(auto val, auto(&ar)[sz]){ bool found=false; for (auto i=0;i<sz;++i) found |= ar[i]==val; return found; };
-    while (!stack.empty() && check_contains(ind, stack.back().back_event_non_zero_inds)) {
+    while (!stack.empty() && check_contains(ind, stack.back().back_event_non_zero_ids)) {
       visit([&](auto& s) { call_on_exit(obj, s, e); }, stack.back().st);
       pop_back(stack);
       visit([&](auto& s) { call_on_enter(obj, s, e); }, cur_state());
     }
-    for (signed i=0;i<stack.size();++i) if (check_contains(ind, stack[i].back_event_non_zero_inds)) erase(f, stack, i--);
+    for (signed i=0;i<stack.size();++i) if (check_contains(ind, stack[i].back_event_non_zero_ids)) erase(f, stack, i--);
   }
   template<typename next_type> constexpr auto& make_next_state(auto tinfo, auto& next) {
     if constexpr (tinfo.mod_stack_by_event==type_c<>) return variant_emplace<next_type>(f, cur_state(), next);
@@ -128,7 +128,7 @@ private:
       auto& ret = empace_back(stack, std::move(next));
       unpack(decltype(+tinfo.mod_stack_by_event)::back_events, [&](auto... events) {
         auto ind=-1;
-        (void)( true && ... && (ret.back_event_non_zero_inds[++ind]=1+index_of(all_events(), events),true));
+        (void)( true && ... && (ret.back_event_non_zero_ids[++ind]=hash<factory>(find(all_events(), events)),true));
       });
       return ret;
     }
@@ -136,12 +136,14 @@ private:
 };
 
 template<typename factory, typename object> constexpr auto scenario<factory, object>::all_events() {
-  return unpack(all_trans_info(), [](auto... states) {
+  auto list = unpack(all_trans_info(), [](auto... states) {
     return (type_list{} << ... << [](auto st) {
       if constexpr (st.mod_stack_by_event==type_c<>) return st.event;
       else return type_list{} << st.event << decltype(+st.mod_stack_by_event)::back_events;
     }(decltype(+states){}));
   });
+  static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some events (hash==0)" );
+  return list;
 }
 
 template<typename factory, typename object> constexpr auto scenario<factory, object>::all_trans_info() {
@@ -156,7 +158,9 @@ template<typename factory, typename object> constexpr auto scenario<factory, obj
 template<typename factory, typename object> constexpr auto scenario<factory, object>::all_states() {
   auto def = filter(info{}, [](auto info){if constexpr(requires{decltype(+info)::is_def_state;}) return decltype(+info)::st; else return type_c<>;});
   static_assert( size(def) < 2, "few default states was picked to scenario" );
-  return unpack(all_trans_info(), [&](auto... states){ return (((type_list<>{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to); });
+  auto list = unpack(all_trans_info(), [&](auto... states){ return (((type_list<>{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to); });
+  static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );
+  return list;
 }
 
 template<typename factory, typename object> constexpr auto scenario<factory, object>::search(auto from, auto event) {

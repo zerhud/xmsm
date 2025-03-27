@@ -10,6 +10,8 @@
 
 #include <utility>
 
+#include "hash.hpp"
+
 namespace xmsm {
 
 template<typename t> struct _type_c{ using type = t; t operator+() const ; };
@@ -47,6 +49,9 @@ template<typename... items> constexpr auto index_of(const type_list<items...>&, 
   (void)( false || ... || (++ind,type_c<items> <= item));
   return ind;
 }
+constexpr auto find(const auto& list, auto item) {
+  return get<index_of(list, item)>(list);
+}
 template<typename... items> constexpr auto filter(const type_list<items...>&, auto&& p) {
   if constexpr (sizeof...(items)==0) return type_list{};
   else if constexpr (type_dc<decltype(p(type_c<__type_pack_element<0, items...>>))> != type_c<bool>) return (type_list{} << ... << p(type_c<items>));
@@ -63,5 +68,23 @@ consteval auto max_min_size(auto&&... lists) {
   (void)( true && ... && (ret=size(lists)) );
   return ret;
 }
+
+template<typename factory, typename type> constexpr auto name(_type_c<type>) {
+  using sv = factory::string_view;
+  auto ret = sv{__PRETTY_FUNCTION__};
+  ret.remove_suffix(1);
+  ret.remove_prefix(ret.find(sv{"type = "}) + 7);
+  return ret;
+}
+
+template<typename factory> constexpr auto hash32(auto type) {
+  auto src = name<factory>(type);
+  return hash32(src.data(), src.size(), 0);
+}
+template<typename factory> constexpr auto hash64(auto type) {
+  auto src = name<factory>(type);
+  return hash64(src.data(), src.size(), 0);
+}
+template<typename factory> constexpr auto hash(auto type) { return hash32<factory>(type); }
 
 }

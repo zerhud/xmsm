@@ -12,10 +12,12 @@
 
 #include <vector>
 #include <variant>
+#include <string_view>
 
 namespace tests {
 
 struct factory {
+  using string_view = std::string_view;
 };
 
 template<typename... types> constexpr auto mk_variant(const factory&) {
