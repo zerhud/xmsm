@@ -163,13 +163,14 @@ private:
 };
 
 template<typename factory, typename object, typename user_type> constexpr auto scenario<factory, object, user_type>::all_events() {
-  auto list = unpack(all_trans_info(), [](auto... states) {
+  constexpr auto list = unpack(all_trans_info(), [](auto... states) {
     return (type_list{} << ... << [](auto st) {
       if constexpr (st.mod_stack_by_event==type_c<>) return st.event;
       else return type_list{} << st.event << decltype(+st.mod_stack_by_event)::back_events;
     }(decltype(+states){}));
   });
   static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some events (hash==0)" );
+  static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in events found" );
   return list;
 }
 
@@ -187,6 +188,7 @@ template<typename factory, typename object, typename user_type> constexpr auto s
   static_assert( size(def) < 2, "few default states was picked to scenario" );
   auto list = unpack(all_trans_info(), [&](auto... states){ return (((type_list<>{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to); });
   static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );
+  static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in states found" );
   return list;
 }
 

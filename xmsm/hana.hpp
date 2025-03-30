@@ -14,6 +14,8 @@
 
 namespace xmsm {
 
+template<auto v> struct _value{ constexpr static auto val = v; };
+template<auto v> constexpr auto value_c = _value<v>{};
 template<typename t> struct _type_c{ using type = t; t operator+() const ; };
 template<typename t=void> constexpr auto type_c = _type_c<t>{};
 template<typename t=void> constexpr auto type_dc = _type_c<std::decay_t<t>>{};
@@ -86,5 +88,26 @@ template<typename factory> constexpr auto hash64(auto type) {
   return hash64(src.data(), src.size(), 0);
 }
 template<typename factory> constexpr auto hash(auto type) { return hash32<factory>(type); }
+
+template<typename type, auto ind> struct tuple_value {
+  type value;
+  template<auto i> constexpr type& g() requires(i==ind){ return value; }
+  template<auto i> constexpr const type& g() const requires(i==ind){ return value; }
+  template<auto i> constexpr friend type& get(tuple_value& t) requires(i==ind){ return t.value; }
+  template<auto i> constexpr friend const type& get(const tuple_value& t) requires(i==ind){ return t.value; }
+};
+constexpr auto mk_tuple(auto&&... items) {
+  return [&]<auto... inds>(std::index_sequence<inds...>){
+    struct tuple_storage : tuple_value<decltype(items), inds>... {
+      using tuple_value<decltype(items), inds>::g...;
+      constexpr decltype(sizeof...(items)) size() const { return sizeof...(items); }
+    };
+    return tuple_storage{std::forward<decltype(items)>(items)...};
+  }(std::make_index_sequence<sizeof...(items)>{});
+}
+
+constexpr auto has_duplicates(auto&&... items) {
+  return (0 + ... + [&](auto cur){ return (-1 + ... + (cur==items)); }(items)) / 2;
+}
 
 }
