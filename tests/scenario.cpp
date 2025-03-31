@@ -158,5 +158,26 @@ static_assert( [] {
   return ret;
 }() == 15 );
 
+struct ts_with_if {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f, only_if(f, in<ts1, state<1>>(f)))
+      , mk_trans<state<0>, state<2>, event<0>>(f)
+      , mk_trans<state<2>, state<0>, event<10>>(f)
+    );
+  }
+};
+static_assert( [] {
+  xmsm::scenario<factory, ts1> s_ts1{factory{}};
+  xmsm::scenario<factory, ts_with_if> s{factory{}};
+  s.on(event<0>{});
+  if (!s.in_state<state<2>>()) throw __LINE__;
+  s_ts1.on(event<0>{});
+  if (!s_ts1.in_state<state<1>>()) throw __LINE__;
+  s.on(event<10>{});
+  s.on(event<0>{}, s_ts1);
+  return s.in_state<state<1>>();
+}(), "the transition won't happen if only_if condition evaluates to false" );
+
 int main(int,char**) {
 }

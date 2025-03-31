@@ -51,12 +51,14 @@ template<typename type> constexpr bool test_var_in_state(const auto& v) {
 }
 
 constexpr void call_on_exit(auto& scenario, auto& state, const auto& event) {
+  //TODO: try to call member function first
   if constexpr(requires{on_exit(scenario, state, event);}) on_exit(scenario, state, event);
   else if constexpr(requires{on_exit(scenario, state);}) on_exit(scenario, state);
   else if constexpr(requires{onExit(scenario, state, event);}) onExit(scenario, state, event);
   else if constexpr(requires{OnExit(scenario, state);}) OnExit(scenario, state);
 }
 constexpr void call_on_enter(auto& scenario, auto& state, const auto& event) {
+  //TODO: try to call member function first
   if constexpr(requires{on_enter(scenario, state, event);}) on_enter(scenario, state, event);
   else if constexpr(requires{on_enter(scenario, state);}) on_enter(scenario, state);
   else if constexpr(requires{onEnter(scenario, state, event);}) onEnter(scenario, state, event);
