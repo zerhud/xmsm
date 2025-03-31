@@ -12,6 +12,7 @@
 #include "customizations.hpp"
 #include "modificators.hpp"
 #include "scenario_checkers.hpp"
+#include "declarations.hpp"
 
 namespace xmsm {
 
@@ -19,6 +20,7 @@ template<typename _from, typename _to, typename _event, typename... _mods>
 struct trans_info {
   consteval static auto all_stack_by_event() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_stack_by_event;};}); }
   consteval static auto all_stack_by_expression() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_stack_by_expression;};}); }
+  consteval static auto all_mod_when() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_when;};}); }
 
   constexpr static bool is_trans_info = true;
   constexpr static auto to = type_c<_to>;
@@ -27,6 +29,7 @@ struct trans_info {
   constexpr static auto mods = type_list<_mods...>{};
   constexpr static auto mod_stack_by_event = first(all_stack_by_event());
   constexpr static auto mod_stack_by_expression = first(all_stack_by_expression());
+  constexpr static auto mod_when = first(all_mod_when());
 
   static_assert( size(all_stack_by_event()) < 2, "only single stack by event modification is available for transition" );
 };
@@ -45,7 +48,7 @@ struct scenario {
   friend constexpr auto mk_sm_description(const scenario&, auto&&... args) {
     return type_list<decltype(+type_dc<decltype(args)>)...>{};
   }
-  template<typename from, typename to, typename event, typename... mods>
+  template<typename from, typename to, typename event=void, typename... mods>
   friend constexpr auto mk_trans(const scenario&, auto&&... mods_obj) {
     constexpr auto mods_list = type_list<decltype(+type_dc<decltype(mods_obj)>)...>{};
     return unpack(mods_list, [](auto... s){return trans_info<from, to, event, decltype(+s)..., mods...>{};});
@@ -53,12 +56,16 @@ struct scenario {
   template<typename st> friend constexpr auto pick_def_state(const scenario&) { return modificators::def_state<st>{}; }
   template<typename... e> friend constexpr auto stack_by_event(const scenario&) { return modificators::stack_by_event<e...>{}; }
   template<typename s, typename... st> friend constexpr auto in(const scenario&){ return scenario_checker::in<s, st...>{}; }
+  template<typename s, typename... st> friend constexpr auto now_in(const scenario&){ return scenario_checker::now_in<s, st...>{}; }
   template<typename e> friend constexpr auto stack_by_expr(const scenario&, e) { return modificators::stack_by_expression<e>{}; }
+  template<typename e> friend constexpr auto when(const scenario&, e) { return modificators::when<e>{}; }
 
   using info = decltype(object::describe_sm(std::declval<scenario>()));
   constexpr static auto all_trans_info() ;
   constexpr static bool is_stack_with_event_required() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_stack_by_event!=type_c<>)); }); }
   constexpr static bool is_stack_with_expression_required() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_stack_by_expression!=type_c<>)); }); }
+  constexpr static bool is_mod_on_requires() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_on!=type_c<>)); }); }
+  constexpr static bool is_mod_when_requires() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_when!=type_c<>)); }); }
   constexpr static auto all_states() ;
   constexpr static auto all_events() ;
   constexpr static auto search(auto from, auto event) ;
@@ -94,9 +101,12 @@ struct scenario {
   user_type obj;
   decltype(mk_states_type(std::declval<factory>())) state;
   [[no_unique_address]] decltype(mk_stack_type(std::declval<factory>())) stack;
+  scenario_state _own_state{scenario_state::ready};
 
   constexpr explicit scenario(factory f) : f(std::move(f)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)) {}
 
+  constexpr scenario_state own_state() const { return _own_state; }
+  constexpr void reset_own_state() { _own_state=scenario_state::ready; }
   constexpr auto cur_state_hash() const {
     return visit([](const auto& s) { return hash<factory>(find(all_states(), type_dc<decltype(s)>)); }, cur_state());
   }
@@ -106,6 +116,7 @@ struct scenario {
   }
   constexpr void on_other_scenarios_changed(const auto& e, auto&&... scenarios) {
     if constexpr(is_stack_with_expression_required()) clean_stack_by_expr(e, std::forward<decltype(scenarios)>(scenarios)...);
+    if constexpr(is_mod_when_requires()) while (exec_when(e, std::forward<decltype(scenarios)>(scenarios)...));
   }
   constexpr void on(const auto& e) {
     constexpr auto e_type = type_dc<decltype(e)>;
@@ -114,10 +125,7 @@ struct scenario {
       visit([&](auto& s) {
         constexpr auto s_type = type_dc<decltype(s)>;
         if constexpr (auto info_on_event = search(s_type, e_type); info_on_event != type_c<>) {
-          using next_type = decltype(+decltype(+info_on_event)::to);
-          auto next = create_state<next_type>(f, e);
-          call_on_exit(obj, s, e);
-          call_on_enter(obj, make_next_state<next_type>(decltype(+info_on_event){}, next), e);
+          change_state<decltype(+decltype(+info_on_event)::to), decltype(+info_on_event)>(e);
         }
       }, cur_state());
     }
@@ -128,6 +136,27 @@ struct scenario {
   constexpr static auto states_count() { return size(all_states()); }
   constexpr static auto events_count() { return size(all_events()); }
 private:
+  template<typename next_type, typename trans_info> constexpr void change_state(const auto& e) {
+    _own_state = scenario_state::broken;
+    auto next = create_state<next_type>(f, e);
+    visit([&](auto& s) {
+      call_on_exit(obj, s, e);
+      call_on_enter(obj, make_next_state<next_type>(trans_info{}, next), e);
+    }, cur_state());
+    _own_state = scenario_state::fired;
+  }
+  constexpr int exec_when(const auto& e, auto&&... scenarios) {
+    auto cur_hash = cur_state_hash();
+    return foreach(all_trans_info(), [&](auto t) {
+      if constexpr(decltype(+t)::mod_when!=type_c<>) {
+        if (cur_hash==hash<factory>(decltype(+t)::from) && t().mod_when().expression(scenarios...)) {
+          change_state<decltype(+decltype(+t)::to), decltype(+t)>(e);
+          return true;
+        }
+      }
+      return false;
+    });
+  }
   constexpr auto clean_stack_by_expr(const auto& e, auto&&... scenarios) {
     auto check = [&](auto e) { return visit([&](auto expr){return expr(std::forward<decltype(scenarios)>(scenarios)...);}, e); };
     while (!stack.empty() && check(stack.back().back_expression)) {
@@ -170,7 +199,10 @@ template<typename factory, typename object, typename user_type> constexpr auto s
     }(decltype(+states){}));
   });
   static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some events (hash==0)" );
-  static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in events found" );
+  if constexpr (constexpr auto dup_cnt = unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);}); dup_cnt!=0) {
+    list.__has_duplicates();
+    static_assert(dup_cnt ==0, "hash collision in events found" );
+  }
   return list;
 }
 

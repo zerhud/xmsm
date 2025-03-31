@@ -27,4 +27,16 @@ template<typename type> struct def_state {
   constexpr static auto st = type_c<type>;
 };
 
+template<typename e> struct when { constexpr static bool is_when = true; constexpr static e expression{}; };
+template<typename e> struct only_if { constexpr static bool is_only_if = true; constexpr static auto expression = type_c<e>; };
+
+template<typename sc, typename st> struct move_to {
+  constexpr static auto scenario = type_c<sc>;
+  constexpr static auto state = type_c<st>;
+};
+template<typename sc, typename st> struct try_move_to {
+  constexpr static auto scenario = type_c<sc>;
+  constexpr static auto state = type_c<st>;
+};
+
 }

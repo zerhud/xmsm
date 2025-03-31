@@ -49,6 +49,14 @@ static_assert( [] {
   s.on(event<1>{});
   return after_init + 2*s.in_state<state<0>>() + 4*(s.states_count()==2);
 }() == 7 );
+static_assert( [] {
+  xmsm::scenario<factory, ts1> s{factory{}};
+  if (s.own_state()!=xmsm::scenario_state::ready) throw __LINE__;
+  s.on(event<0>{});
+  if (s.own_state()!=xmsm::scenario_state::fired) throw __LINE__;
+  s.reset_own_state();
+  return s.own_state() == xmsm::scenario_state::ready;
+}() );
 
 struct ts_with_stack {
   int val{0};
@@ -119,6 +127,36 @@ static_assert( [] {
   s.on_other_scenarios_changed(e, s_ts1);
   return s.obj.val;
 }() == 7 );
+
+struct ts_with_on {
+  int val{};
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<1>>(f, when(f, in<ts1, state<1>>(f)), stack_by_event<event<10>>(f))
+      , mk_trans<state<1>, state<2>>(f, when(f, in<ts1_def1, state<1>>(f)))
+      , mk_trans<state<2>, state<3>>(f, when(f, now_in<ts1, state<1>>(f)), stack_by_event<event<11>>(f))
+    );
+  }
+};
+static_assert( [] {
+  xmsm::scenario<factory, ts1> s_ts1{factory{}};
+  xmsm::scenario<factory, ts1_def1> s_ts1_def1{factory{}};
+  xmsm::scenario<factory, ts_with_on> s{factory{}};
+  s.on_other_scenarios_changed(event<0>{}, s_ts1, s_ts1_def1);
+  if (!s.in_state<state<0>>()) throw __LINE__;
+  s_ts1_def1.on(event<0>{});
+  s.on_other_scenarios_changed(event<0>{}, s_ts1, s_ts1_def1);
+  if (!s.in_state<state<0>>()) throw __LINE__;
+  if (!s_ts1_def1.in_state<state<1>>()) throw __LINE__;
+  s_ts1.on(event<0>{});
+  s.on_other_scenarios_changed(event<0>{}, s_ts1, s_ts1_def1);
+  auto ret = s.in_state<state<3>>() + 2*(s.stack_size()==2);
+  s_ts1.reset_own_state();
+  s.on(event<11>{});
+  s.on_other_scenarios_changed(event<0>{}, s_ts1, s_ts1_def1);
+  ret += 4*s.in_state<state<2>>() + 8*(s.stack_size()==1);
+  return ret;
+}() == 15 );
 
 int main(int,char**) {
 }

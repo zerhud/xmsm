@@ -62,5 +62,13 @@ constexpr void call_on_enter(auto& scenario, auto& state, const auto& event) {
   else if constexpr(requires{onEnter(scenario, state, event);}) onEnter(scenario, state, event);
   else if constexpr(requires{OnEnter(scenario, state);}) OnEnter(scenario, state);
 }
+constexpr bool xmsm_contains(const auto& con, const auto& item) {
+  if constexpr(requires{contains(con, item);}) return contains(con, item);
+  else if constexpr(requires{con.contains(item);}) return con.contains(item);
+  else {
+    for (auto i=0;i<con.size();++i) if (con[i]==item) return true;
+    return false;
+  }
+}
 
 }

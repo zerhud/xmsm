@@ -16,14 +16,19 @@ namespace xmsm {
 
 template<auto v> struct _value{ constexpr static auto val = v; };
 template<auto v> constexpr auto value_c = _value<v>{};
-template<typename t> struct _type_c{ using type = t; t operator+() const ; };
+template<typename t> struct _type_c{ using type = t; t operator+() const ; constexpr t operator()()const{return t{};} };
+template<typename t> constexpr t operator*(const _type_c<t>&){ return t{}; }
 template<typename t=void> constexpr auto type_c = _type_c<t>{};
 template<typename t=void> constexpr auto type_dc = _type_c<std::decay_t<t>>{};
 template<typename l, typename r> constexpr bool operator==(_type_c<l>, _type_c<r>) { return false; }
 template<typename c> constexpr bool operator==(_type_c<c>, _type_c<c>) { return true; }
 template<typename l, typename r> constexpr bool operator<=(_type_c<l> ll, _type_c<r> rr) { return __is_base_of(l, r); }
 template<typename l, typename r> constexpr bool operator>=(_type_c<l> ll, _type_c<r> rr) { return __is_base_of(r, l); }
+template<typename l> constexpr bool operator<=(_type_c<l> ll, _type_c<l> rr) { return true; }
+template<typename l> constexpr bool operator>=(_type_c<l> ll, _type_c<l> rr) { return true; }
 template<typename...> struct type_list{};
+template<typename... l, typename... r> constexpr bool operator==(type_list<l...>, type_list<r...>) { return false; }
+template<typename... c> constexpr bool operator==(type_list<c...>, type_list<c...>) { return true; }
 template<typename... items> constexpr auto size(const type_list<items...>&) { return sizeof...(items); }
 template<typename type, typename... items> constexpr bool contains(const type_list<items...>&) {
   return (0 + ... + (type_c<items> <= type_c<type>));
@@ -37,13 +42,14 @@ template<typename... items, typename type> constexpr auto operator<<(const type_
   if constexpr (t == type_c<> || contains(l, t)) return l;
   else return type_list<items..., type>{};
 }
-template<typename... left, typename... right> constexpr auto operator<<(const type_list<left...>&, const type_list<right...>&) {
-  return type_list<left..., right...>{};
+template<typename... left, typename... right> constexpr auto operator<<(const type_list<left...>& l, const type_list<right...>&) {
+  return (l << ... << type_c<right>);
 }
 template<typename... items> constexpr auto unpack(const type_list<items...>&, auto&& fnc) {
-  return [&]<auto... inds>(std::index_sequence<inds...>){
-    return fnc(type_c<items>...);
-  }(std::make_index_sequence<sizeof...(items)>{});
+  return fnc(type_c<items>...);
+}
+template<typename... items> constexpr bool foreach(const type_list<items...>&, auto&& fnc) {
+  return (false || ... || fnc(type_c<items>));
 }
 template<auto ind, typename... items> constexpr auto get(const type_list<items...>&) { return type_c<__type_pack_element<ind, items...>>; }
 template<typename... items> constexpr auto index_of(const type_list<items...>&, auto item) {

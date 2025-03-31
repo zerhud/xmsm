@@ -1,6 +1,6 @@
 builddir := make_build
 GCC := g++ -MMD -pipe -std=gnu++26 -fwhole-program -march=native -fdiagnostics-color=always -fdiagnostics-all-candidates 
-CLANG := clang++ -MMD -pipe -std=gnu++26 -march=native -fdiagnostics-color=always -ftemplate-backtrace-limit=0
+CLANG := clang++ -MMD -pipe -std=gnu++26 -march=native -fdiagnostics-color=always -ftemplate-backtrace-limit=0 -Wno-overloaded-shift-op-parentheses
 INCLUDES := -I. -I./absd -Ijiexpr -Iast_graph -Ivirtual_variant -Ijinja
 
 tests_src := $(shell find . -ipath '*/tests/*.cpp' | sed 's/^..//g')

@@ -9,8 +9,7 @@
  *************************************************************************/
 
 #include "hana.hpp"
-
-namespace xmsm { template<typename, typename, typename> struct scenario; }
+#include "declarations.hpp"
 
 namespace xmsm::scenario_checker {
 
@@ -23,6 +22,17 @@ template<typename sc, typename... st> struct in {
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
     auto cur = s.cur_state_hash();
     return scenario == type_dc<obj> && unpack(states, [&](auto... i){ return (false || ... || (hash<factory>(i)==cur)); });
+  }
+};
+
+template<typename sc, typename... st> struct now_in {
+  constexpr static bool is_checker = true;
+  constexpr static auto scenario = type_c<sc>;
+  constexpr static auto states = (type_list{} << ... << type_c<st>);
+
+  constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
+  template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
+    return s.own_state() == scenario_state::fired && in<sc,st...>::check(s);
   }
 };
 

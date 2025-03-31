@@ -27,6 +27,16 @@ static_assert( xmsm::has_duplicates(1,2,1) == 1 );
 static_assert( xmsm::has_duplicates(1,1,1) == 3, "the function are not really good to find duplications count, but 0 means there is no duplicates" );
 static_assert( xmsm::has_duplicates(1,1,2,2) == 2 );
 
+struct base{}; struct child : base{};
+static_assert( xmsm::type_c<int> <= xmsm::type_c<int>, "test for integral types" );
+static_assert( xmsm::type_c<base> <= xmsm::type_c<base>, "test for user types" );
+static_assert( xmsm::type_c<base> <= xmsm::type_c<child>, "test for user types" );
+static_assert(  contains(xmsm::type_list<int,char>{}, xmsm::type_c<char>) );
+static_assert( !contains(xmsm::type_list<int,double>{}, xmsm::type_c<char>) );
+static_assert( xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<int> << xmsm::type_list<double,int,int>{} == xmsm::type_list<int,double>{} );
+static_assert( xmsm::type_list{} << xmsm::type_c<base> << xmsm::type_c<child> == xmsm::type_list<base>{} );
+static_assert( xmsm::type_list{} << xmsm::type_c<child> << xmsm::type_c<base> == xmsm::type_list<child,base>{} );
+
 int main(int,char**){
   std::cout << "hash42(foo) == |" << hash64<tests::factory>(xmsm::type_c<foo>) << '|' << std::endl;
 }
