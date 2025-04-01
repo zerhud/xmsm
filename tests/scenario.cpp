@@ -179,5 +179,31 @@ static_assert( [] {
   return s.in_state<state<1>>();
 }(), "the transition won't happen if only_if condition evaluates to false" );
 
+struct ts_with_state_mods {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f)
+      , mk_trans<state<1>, state<2>, event<0>>(f)
+      , mk_trans<state<2>, state<0>, event<10>>(f)
+      , to_state_mods<state<1>>(f, stack_by_event<event<11>>(f))
+      , from_state_mods<state<2>>(f, only_if(f, in<ts1, state<1>>(f)))
+    );
+  }
+};
+static_assert( [] {
+  xmsm::scenario<factory, ts1> s_ts1{factory{}};
+  xmsm::scenario<factory, ts_with_state_mods> s{factory{}};
+  s.on(event<0>{});
+  if (s.stack_size()!=1) throw __LINE__;
+  s.on(event<0>{});
+  if (!s.in_state<state<2>>()) throw __LINE__;
+  s.on(event<10>{});
+  if (!s.in_state<state<2>>()) throw __LINE__;
+  s_ts1.on(event<0>{});
+  s.on(event<10>{}, s_ts1);
+  if (!s.in_state<state<0>>()) throw __LINE__;
+  return s.stack_size();
+}() == 1 );
+
 int main(int,char**) {
 }

@@ -36,6 +36,11 @@ struct trans_info {
   static_assert( size(all_stack_by_event()) < 2, "only single stack by event modification is available for transition" );
 };
 
+template<typename... adding, typename _from, typename _to, typename _event, typename... _mods>
+constexpr auto add_mods(_type_c<trans_info<_from, _to, _event, _mods...>>, const type_list<adding...>&) {
+  return type_c<trans_info<_from, _to, _event, _mods..., adding...>>;
+}
+
 template<typename state, auto max_event_count, typename expr>
 struct stack_frame {
   state st;
@@ -62,6 +67,8 @@ struct scenario {
   template<typename e> friend constexpr auto stack_by_expr(const scenario&, e) { return modificators::stack_by_expression<e>{}; }
   template<typename e> friend constexpr auto when(const scenario&, e) { return modificators::when<e>{}; }
   template<typename e> friend constexpr auto only_if(const scenario&, e) { return modificators::only_if<e>{}; }
+  template<typename st, typename... _mods> friend constexpr auto to_state_mods(const scenario&, _mods...) { return modificators::to_state_mods<st, _mods...>{}; }
+  template<typename st, typename... _mods> friend constexpr auto from_state_mods(const scenario&, _mods...) { return modificators::from_state_mods<st, _mods...>{}; }
 
   using info = decltype(object::describe_sm(std::declval<scenario>()));
   constexpr static auto all_trans_info() ;
@@ -210,11 +217,21 @@ template<typename factory, typename object, typename user_type> constexpr auto s
 }
 
 template<typename factory, typename object, typename user_type> constexpr auto scenario<factory, object, user_type>::all_trans_info() {
-  return unpack(info{}, [](auto... info) {
+  constexpr auto tlist = unpack(info{}, [](auto... info) {
     return (type_list<>{} << ... << [](auto item){
       if constexpr (requires{decltype(+item)::is_trans_info;}) return item;
       else return type_c<>;
     }(info));
+  });
+  constexpr auto to_list = filter(info{}, [](auto i){return requires{i().is_to_state_mods;};});
+  constexpr auto from_list = filter(info{}, [](auto i){return requires{i().is_from_state_mods;};});
+  return unpack(tlist, [&](auto... transitions) {
+    return (type_list{} << ... << [&](auto cur) {
+      auto cur_to_list = filter(to_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::to;});
+      auto cur_from_list = filter(from_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::from;});
+      auto mods = [](auto l){return unpack(l, [](auto... i){return (type_list{} << ... << i().mods);});};
+      return add_mods(add_mods(cur, mods(cur_to_list)), mods(cur_from_list));
+    }(transitions));
   });
 }
 

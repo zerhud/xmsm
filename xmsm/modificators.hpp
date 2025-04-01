@@ -26,6 +26,16 @@ template<typename type> struct def_state {
   constexpr static bool is_def_state = true;
   constexpr static auto st = type_c<type>;
 };
+template<typename type, typename... _mods> struct to_state_mods {
+  constexpr static bool is_to_state_mods = true;
+  constexpr static auto st = type_c<type>;
+  constexpr static auto mods = type_list<_mods...>{};
+};
+template<typename type, typename... _mods> struct from_state_mods {
+  constexpr static bool is_from_state_mods = true;
+  constexpr static auto st = type_c<type>;
+  constexpr static auto mods = type_list<_mods...>{};
+};
 
 template<typename e> struct when { constexpr static bool is_when = true; constexpr static e expression{}; };
 template<typename e> struct only_if { constexpr static bool is_only_if = true; constexpr static e expression{}; };
