@@ -28,6 +28,9 @@ template<typename type> constexpr auto mk_list(const factory&) {
   ret.reserve(1000); // we can't use std::list in constexpr context, and the vector shouldn't move elements
   return ret;
 }
+template<typename type> constexpr auto mk_atomic(const factory&) {
+  return type{};
+}
 constexpr void erase(const factory&, auto& cnt, auto ind) {
   cnt.erase(cnt.begin() + ind);
 }

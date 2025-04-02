@@ -6,6 +6,9 @@
  * or <http://www.gnu.org/licenses/> for details
  *************************************************************************/
 
+#include <map>
+#include <string>
+#include <stdexcept>
 #include "factory.hpp"
 
 template<auto v> using state = tests::state<v>;
@@ -205,5 +208,59 @@ static_assert( [] {
   return s.stack_size();
 }() == 1 );
 
+struct multi_ts {
+  static auto describe_sm(const auto& f) {
+    return mk_multi_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f)
+      , mk_trans<state<1>, state<2>>(f)
+      , mk_trans<state<1>, state<1000>, event<101>>(f)
+      , mk_trans<state<2>, state<0>, event<10>>(f)
+      , to_state_mods<state<2>>(f, when(f, in<ts1, state<1>>(f)))
+      , finish_state<state<1000>>(f), start_event<event<100>>(f)
+    );
+  }
+};
+static_assert( [] { xmsm::scenario<factory, multi_ts> s{factory{}}; return s.is_multi() + 2*s.empty() + 4*(s.count()==0); }() == 7 );
+static_assert( [] {
+  xmsm::scenario<factory, multi_ts> s{factory{}};
+  xmsm::scenario<factory, ts1> s_ts1{factory{}};
+  if (s.own_state() != xmsm::scenario_state::ready) throw __LINE__;
+  s.on(event<100>{});
+  if (s.own_state() != xmsm::scenario_state::fired) throw __LINE__;
+  if (s.count()!=1) throw __LINE__;
+  s.on(event<100>{});
+  if (s.count()!=2) throw __LINE__;
+  if (s.own_state() != xmsm::scenario_state::fired) throw __LINE__;
+  s.reset_own_state();
+  if (s.own_state() != xmsm::scenario_state::ready) throw __LINE__;
+  s.on(event<0>{});
+  if (s.count()!=2) throw __LINE__;
+  if (s.count_in<state<0>>()!=0) throw __LINE__;
+  if (s.count_in<state<1>>()!=2) throw __LINE__;
+  s.on_address(event<101>{}, s.scenarios[0].id);
+  if (s.count()!=1) throw __LINE__;
+  s_ts1.on(event<0>{});
+  s.on_other_scenarios_changed(event<200>{}, s_ts1);
+  return (s.count()==1) + 2*(s.count_in<state<2>>()==1);
+}() == 3 );
+
+struct rt_factory : factory {};
+template<typename key, typename value> auto mk_map(const rt_factory&){ return std::map<key,value>{}; }
+void erase_if(const rt_factory&, auto& con, auto&& fnc) {
+  for (auto pos=con.begin();pos!=con.end();) {
+    if (fnc(*pos)) pos = con.erase(pos);
+    else ++pos;
+  }
+}
 int main(int,char**) {
+  {
+    xmsm::scenario<rt_factory, multi_ts> s{rt_factory{}};
+    if (s.own_state() != xmsm::scenario_state::ready) throw std::runtime_error(std::to_string(__LINE__));
+    s.on(event<100>{});
+    if (s.own_state() != xmsm::scenario_state::fired) throw std::runtime_error(std::to_string(__LINE__));
+    if (s.count()!=1) throw std::runtime_error(std::to_string(__LINE__));
+    s.on(event<0>{});
+    s.on(event<101>{});
+    if (s.count()!=0) throw std::runtime_error(std::to_string(__LINE__));
+  }
 }

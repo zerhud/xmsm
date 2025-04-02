@@ -26,6 +26,14 @@ template<typename type> struct def_state {
   constexpr static bool is_def_state = true;
   constexpr static auto st = type_c<type>;
 };
+template<typename type> struct finish_state {
+  constexpr static bool is_finish_state = true;
+  constexpr static auto st = type_c<type>;
+};
+template<typename type> struct start_event {
+  constexpr static bool is_start_event = true;
+  constexpr static auto event = type_c<type>;
+};
 template<typename type, typename... _mods> struct to_state_mods {
   constexpr static bool is_to_state_mods = true;
   constexpr static auto st = type_c<type>;

@@ -33,8 +33,9 @@ template<typename... items> constexpr auto size(const type_list<items...>&) { re
 template<typename type, typename... items> constexpr bool contains(const type_list<items...>&) {
   return (0 + ... + (type_c<items> <= type_c<type>));
 }
-template<typename type, typename... items> constexpr bool contains(const type_list<items...>& l, _type_c<type>) {
-  return contains<type>(l);
+template<typename type, typename... items> constexpr bool contains(const type_list<items...>& l, _type_c<type>) { return contains<type>(l); }
+template<typename... items, typename... checks> constexpr bool contains(const type_list<items...>& list, const type_list<checks...>&) {
+  return (0+...+contains<checks>(list));
 }
 template<typename... l, typename r> constexpr auto operator+(const type_list<l...>&, _type_c<r>) { return type_list<l..., r>{}; }
 template<typename... l, typename... r> constexpr auto operator+(const type_list<l...>&, const type_list<r...>&) { return type_list<l..., r...>{}; }

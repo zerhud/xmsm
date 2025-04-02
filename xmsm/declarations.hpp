@@ -10,7 +10,7 @@
 
 namespace xmsm {
 
-enum class scenario_state { ready, broken, fired, empty };
+enum class scenario_state { ready, broken, fired };
 
 template<typename, typename, typename> struct scenario;
 

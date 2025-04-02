@@ -23,13 +23,23 @@ template<typename type> constexpr auto& variant_emplace(const auto& f, auto& v, 
   else return v.template emplace<type>(static_cast<type&&>(next));
 }
 
-constexpr auto& empace_back(auto& obj, auto&& v) {
-  if constexpr(requires{emplace_back(obj, std::move(v));}) return emplace_back(obj, std::move(v));
-  else if constexpr(requires{obj.emplace_back(std::move(v));}) return obj.emplace_back(std::move(v));
-  else return obj.push_back(std::move(v));
+constexpr auto& xmsm_emplace_back(auto& obj, auto&&... v) {
+  if constexpr(requires{emplace_back(obj, std::forward<decltype(v)>(v)...);}) return emplace_back(obj, std::forward<decltype(v)>(v)...);
+  else if constexpr(requires{obj.emplace_back(std::forward<decltype(v)>(v)...);}) return obj.emplace_back(std::forward<decltype(v)>(v)...);
+  else return obj.push_back(std::forward<decltype(v)>(v)...);
 }
 constexpr void pop_back(auto& obj) {
   obj.pop_back();
+}
+
+constexpr auto& xmsm_insert_or_emplace(auto& obj, auto&& key, auto&& val) {
+  if constexpr(requires{obj.insert_or_assign(key, std::forward<decltype(val)>(val));}) {
+    auto [iter, _] = obj.insert_or_assign(std::forward<decltype(key)>(key), std::forward<decltype(val)>(val));
+    return *iter;
+  }
+  else {
+    return xmsm_emplace_back(obj, std::forward<decltype(key)>(key), std::forward<decltype(val)>(val));
+  }
 }
 
 template<typename type> constexpr auto create_state(const auto& f) {
@@ -70,6 +80,25 @@ constexpr bool xmsm_contains(const auto& con, const auto& item) {
   else {
     for (auto i=0;i<con.size();++i) if (con[i]==item) return true;
     return false;
+  }
+}
+
+constexpr auto xmsm_find_pointer(const auto& f, auto& con, const auto& key) {
+  if constexpr(requires{find(f, con, key);}) return find(f, con, key);
+  else {
+    using ret_type = decltype([](auto& i) { auto& [_,s] = i; return &s; }(*begin(con)));
+    for (auto& i:con) {
+      auto& [cur_key, item] = i;
+      if (cur_key==key) return &item;
+    }
+    return (ret_type)nullptr;
+  }
+}
+constexpr void xmsm_erase_if(const auto& f, auto& con, auto&& fnc) {
+  if constexpr(requires{erase_if(f, con, std::forward<decltype(fnc)>(fnc));}) erase_if(f, con, std::forward<decltype(fnc)>(fnc));
+  else {
+    static_assert( requires{con[0];}, "try to provide erase_if method for this container");
+    for (auto i=0;i<con.size();++i) if (fnc(con[i])) erase(f, con, i--);
   }
 }
 
