@@ -35,3 +35,4 @@
 .idea/*
 clion_build/*
 make_build/*
+tmp/*

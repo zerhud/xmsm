@@ -246,6 +246,62 @@ static_assert( [] {
   return (s.count()==1) + 2*(s.count_in<state<2>>()==1);
 }() == 3 );
 
+struct ts_with_queue {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<1>, state<2>, event<1>>(f)
+      , mk_qtrans<state<3>, state<2>, event<2>>(f)
+      , mk_qtrans<state<4>, state<3>, event<3>>(f)
+      , mk_qtrans<state<5>, state<3>, event<4>>(f)
+      , mk_qtrans<state<6>, state<5>, event<5>>(f)
+      , mk_trans<state<0>, state<100>, event<100>>(f)
+    );
+  }
+};
+struct ts_with_move_to {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<100>, state<101>>(f))
+      , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
+    );
+  }
+};
+struct ts_with_try_move_to {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<2>, event<0>>(f, move_to<ts_with_move_to, state<2>, state<100>>(f))
+    );
+  }
+};
+constexpr auto mk_s_queue() {struct{xmsm::scenario<factory, ts_with_queue> q{factory{}}; xmsm::scenario<factory, ts_with_move_to> m{factory{}};}ret; return ret; }
+static_assert( mk_allow_queue_st(xmsm::scenario<factory, ts_with_queue>{factory{}}.all_trans_info(), xmsm::type_c<state<2>>) == xmsm::type_list<
+  xmsm::type_list<tests::state<0>, tests::state<1>, tests::state<2> >,
+  xmsm::type_list<tests::state<4>, tests::state<3>, tests::state<2> >,
+  xmsm::type_list<tests::state<6>, tests::state<5>, tests::state<3>, tests::state<2> > >{} );
+static_assert( [] { xmsm::scenario<factory, ts_with_move_to> s{factory{}}; s.on(event<1>{}); return s.in_state<state<100>>(); }(), "fail if scenario are not present" );
+static_assert( [] {
+  auto [s_q, s] = mk_s_queue();
+  s.on(event<0>{}, s_q);
+  return s.in_state<state<101>>() + 2*s_q.in_state<state<0>>();
+}() == 3, "fail if scenario didn't allow such transition");
+static_assert( [] {
+  auto [s_q, s] = mk_s_queue();
+  s_q.on(event<0>{}); s.on(event<1>{}, s_q);
+  return s.in_state<state<2>>() + 2*s_q.in_state<state<2>>();
+}() == 3, "can handle single transition" );
+static_assert( [] {
+  auto [s_q, s] = mk_s_queue();
+  s.on(event<1>{}, s_q);
+  return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>();
+}() == 3, "can handle few transitions" );
+static_assert( [] {
+  auto [s_q, s] = mk_s_queue();
+  xmsm::scenario<factory, ts_with_try_move_to> s_t{factory{}};
+  s_t.on(event<0>{}, s, s_q);
+  return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>() + 4*s_t.in_state<state<2>>();
+}() == 7, "can handle chain of transitions" );
+
 struct rt_factory : factory {};
 template<typename key, typename value> auto mk_map(const rt_factory&){ return std::map<key,value>{}; }
 void erase_if(const rt_factory&, auto& con, auto&& fnc) {

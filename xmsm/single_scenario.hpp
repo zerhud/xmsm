@@ -9,6 +9,7 @@
  *************************************************************************/
 
 #include "basic_scenario.hpp"
+#include "move_to.hpp"
 
 namespace xmsm {
 
@@ -92,7 +93,7 @@ struct single_scenario : basic_scenario<factory, object> {
       foreach(all_trans_info(), [&](auto t) {
         bool match = cur_hash==hash<factory>(decltype(+t)::from) && e_type <= decltype(+t)::event;
         if constexpr(t().mod_only_if != type_c<>) match &= t().mod_only_if().expression(scenarios...);
-        if (match) change_state<decltype(+t().to), decltype(+t)>(e);
+        if (match && handle_move_to<decltype(+t)>(e, scenarios...)) change_state<decltype(+t().to), decltype(+t)>(e);
         return match;
       });
     }
@@ -107,14 +108,38 @@ struct single_scenario : basic_scenario<factory, object> {
   template<typename type> constexpr bool in_state() const { return cur_state().index() == index_of(all_states(), type_dc<type>); }
   constexpr static auto states_count() { return size(all_states()); }
   constexpr static auto events_count() { return size(all_events()); }
+  template<typename... target> constexpr bool move_to(const auto& e, auto&&... scenarios) {
+    auto cur_hash = cur_state_hash();
+    return foreach(all_trans_info(), [&](auto t) {
+      bool match = cur_hash==hash<factory>(decltype(+t)::from) && ((type_c<target> == decltype(+t)::to) || ...) && decltype(+t)::is_queue_allowed;
+      if constexpr(t().mod_only_if != type_c<>) match &= t().mod_only_if().expression(scenarios...);
+      match &= handle_move_to<decltype(+t)>(e, scenarios...);
+      if (match) change_state<decltype(+t().to), decltype(+t)>(e);
+      return match;
+    });
+  }
 private:
+  template<typename trans_info> constexpr bool handle_move_to(const auto& e, auto&&... scenarios) {
+    if constexpr (trans_info::mod_move_to==type_c<>) return true;
+    else {
+      constexpr auto mod = trans_info::mod_move_to();
+      bool fail = false;
+      const bool found = (false || ... || [&](auto& s) {
+        bool f = s.own_hash() == hash<factory>(mod.scenario);
+        constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
+        if (f) fail = size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to<decltype(+tgts)...>(e, scenarios...);});
+        return f;
+      }(scenarios));
+      if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);
+      if (fail || !found) change_state<decltype(+mod.fail_state), trans_info>(e);
+      return !fail && found;
+    }
+  }
   template<typename next_type, typename trans_info> constexpr void change_state(const auto& e) {
     _own_state = scenario_state::broken;
     auto next = create_state<next_type>(this->f, e);
-    visit([&](auto& s) {
-      call_on_exit(obj, s, e);
-      call_on_enter(obj, make_next_state<next_type>(trans_info{}, next), e);
-    }, cur_state());
+    visit([&](auto& s) { call_on_exit(obj, s, e); }, cur_state());
+    call_on_enter(obj, make_next_state<next_type>(trans_info{}, next), e);
     _own_state = scenario_state::fired;
   }
   constexpr int exec_when(const auto& e, auto&&... scenarios) {
@@ -200,7 +225,10 @@ template<typename factory, typename object, typename user_type> constexpr auto s
 template<typename factory, typename object, typename user_type> constexpr auto single_scenario<factory, object, user_type>::all_states() {
   auto def = filter(info{}, [](auto info){if constexpr(requires{decltype(+info)::is_def_state;}) return decltype(+info)::st; else return type_c<>;});
   static_assert( size(def) < 2, "few default states was picked to scenario" );
-  auto list = unpack(all_trans_info(), [&](auto... states){ return (((type_list{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to); });
+  auto list = unpack(all_trans_info(), [&](auto... states) {
+    constexpr auto find_fail_state = [](auto ti){if constexpr(ti().mod_move_to==type_c<>) return type_c<>; else return ti().mod_move_to().fail_state;};
+    return ((((type_list{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to) << ... << find_fail_state(states));
+  });
   static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );
   static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in states found" );
   return list;

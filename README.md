@@ -79,3 +79,9 @@ Transitions can be customized with modifiers:
    ```
 - `move_to`: Attempts to move another scenario to a specified state. If it fails, move the scenario to fail state (or block the transition)
 - `try_move_to`: Same as `move_to`, but dose nothing on fail
+
+# License
+xmsm is distributed under the [GNU Affero General Public License](https://www.gnu.org/licenses/). See the COPYING file in the repository root.
+
+# Contributing
+Contributions are welcome! Fork the repo, create a PR, or open an issue on GitHub.

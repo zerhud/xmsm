@@ -12,6 +12,7 @@
 
 namespace xmsm::modificators {
 
+struct allow_queue {};
 template<typename e, typename... tail> struct stack_by_event {
   constexpr static bool is_stack_by_event = true;
   constexpr static auto back_events = (type_list<e>{} << ... << type_c<tail>) ;
@@ -48,11 +49,14 @@ template<typename type, typename... _mods> struct from_state_mods {
 template<typename e> struct when { constexpr static bool is_when = true; constexpr static e expression{}; };
 template<typename e> struct only_if { constexpr static bool is_only_if = true; constexpr static e expression{}; };
 
-template<typename sc, typename st> struct move_to {
-  constexpr static auto scenario = type_c<sc>;
-  constexpr static auto state = type_c<st>;
+template<typename sc, typename st, typename fst> struct move_to {
+  constexpr static bool is_move_to = true;
+  constexpr static auto scenario = type_dc<sc>;
+  constexpr static auto state = type_dc<st>;
+  constexpr static auto fail_state = type_dc<fst>;
 };
 template<typename sc, typename st> struct try_move_to {
+  constexpr static bool is_try_move_to = true;
   constexpr static auto scenario = type_c<sc>;
   constexpr static auto state = type_c<st>;
 };

@@ -22,8 +22,10 @@ struct trans_info {
   consteval static auto all_stack_by_expression() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_stack_by_expression;};}); }
   consteval static auto all_mod_when() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_when;};}); }
   consteval static auto all_mod_only_if() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_only_if;};}); }
+  consteval static auto all_mod_move_to() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_move_to;};}); }
 
   constexpr static bool is_trans_info = true;
+  constexpr static bool is_queue_allowed = []{return size(filter(type_list<_mods...>{}, [](auto v){return v == type_c<modificators::allow_queue>;})) > 0;}();
   constexpr static auto to = type_c<_to>;
   constexpr static auto from = type_c<_from>;
   constexpr static auto event = type_c<_event>;
@@ -32,6 +34,7 @@ struct trans_info {
   constexpr static auto mod_stack_by_expression = first(all_stack_by_expression());
   constexpr static auto mod_when = first(all_mod_when());
   constexpr static auto mod_only_if = first(all_mod_only_if());
+  constexpr static auto mod_move_to = first(all_mod_move_to());
 
   static_assert( size(all_stack_by_event()) < 2, "only single stack by event modification is available for transition" );
 };
@@ -44,6 +47,8 @@ constexpr auto add_mods(_type_c<trans_info<_from, _to, _event, _mods...>>, const
 template<typename factory, typename object> struct basic_scenario {
   struct multi_sm_indicator;
   factory f;
+
+  constexpr static auto own_hash() { return hash<factory>(type_c<object>); }
 
   constexpr explicit basic_scenario(factory f) : f(std::move(f)) {}
 
@@ -58,6 +63,8 @@ template<typename factory, typename object> struct basic_scenario {
     constexpr auto mods_list = type_list<decltype(+type_dc<decltype(mods_obj)>)...>{};
     return unpack(mods_list, [](auto... s){return trans_info<from, to, event, decltype(+s)..., mods...>{};});
   }
+  template<typename from, typename to, typename event=void, typename... mods>
+  friend constexpr auto mk_qtrans(const basic_scenario& s, auto&&... mods_obj) { return mk_trans<from, to, event, mods...>(s, modificators::allow_queue{}, std::forward<decltype(mods_obj)>(mods_obj)...); }
   template<typename st> friend constexpr auto pick_def_state(const basic_scenario&) { return modificators::def_state<st>{}; }
   template<typename... e> friend constexpr auto stack_by_event(const basic_scenario&) { return modificators::stack_by_event<e...>{}; }
   friend constexpr auto _true(const basic_scenario&){ return scenario_checker::_true{}; }
@@ -71,6 +78,8 @@ template<typename factory, typename object> struct basic_scenario {
   template<typename st, typename... _mods> friend constexpr auto from_state_mods(const basic_scenario&, _mods...) { return modificators::from_state_mods<st, _mods...>{}; }
   template<typename st> friend constexpr auto finish_state(const basic_scenario&){ return modificators::finish_state<st>{}; }
   template<typename event> friend constexpr auto start_event(const basic_scenario&){ return modificators::start_event<event>{}; }
+  friend constexpr auto allow_queue(const basic_scenario&) { return modificators::allow_queue{}; }
+  template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
 

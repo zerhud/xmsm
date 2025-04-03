@@ -39,6 +39,9 @@ static_assert( xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<int> << xm
 static_assert( xmsm::type_list{} << xmsm::type_c<base> << xmsm::type_c<child> == xmsm::type_list<base>{} );
 static_assert( xmsm::type_list{} << xmsm::type_c<child> << xmsm::type_c<base> == xmsm::type_list<child,base>{} );
 
+static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<char>) == -1 );
+static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<double>) == 1 );
+
 int main(int,char**){
   {
     constexpr auto ct_hash = hash<tests::factory>(xmsm::type_c<tests::state<0>>);

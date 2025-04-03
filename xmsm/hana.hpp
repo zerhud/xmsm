@@ -13,7 +13,6 @@
 #include "hash.hpp"
 
 namespace xmsm {
-
 template<auto v> struct _value{ constexpr static auto val = v; };
 template<auto v> constexpr auto value_c = _value<v>{};
 template<typename t> struct _type_c{ using type = t; t operator+() const ; constexpr t operator()()const{return t{};} };
@@ -55,8 +54,8 @@ template<typename... items> constexpr bool foreach(const type_list<items...>&, a
 template<auto ind, typename... items> constexpr auto get(const type_list<items...>&) { return type_c<__type_pack_element<ind, items...>>; }
 template<typename... items> constexpr auto index_of(const type_list<items...>&, auto item) {
   auto ind=-1;
-  (void)( false || ... || (++ind,type_c<items> <= item));
-  return ind;
+  const bool found = ( false || ... || (++ind,type_c<items> <= item) );
+  return (-1*!found) + ind*found;
 }
 constexpr auto find(const auto& list, auto item) {
   return get<index_of(list, item)>(list);
@@ -115,6 +114,13 @@ constexpr auto mk_tuple(auto&&... items) {
 
 constexpr auto has_duplicates(auto&&... items) {
   return (0 + ... + [&](auto cur){ return (-1 + ... + (cur==items)); }(items)) / 2;
+}
+template<typename first, typename... items> constexpr auto pop_front(const type_list<first, items...>&) { return type_list<items...>{}; }
+template<typename... items> constexpr auto pop_front(const type_list<items...>&, auto&& fnc) {
+  return (type_list{} << ... << [&](auto item) {
+    if constexpr(fnc(item)) return item;
+    else return type_c<>;
+  }(type_c<items>));
 }
 
 }
