@@ -19,8 +19,8 @@ template<typename factory> struct scenario_id_def_generator {
 };
 
 template<typename factory, typename object, typename user_type>
-struct multi_scenario : basic_scenario<factory, object, user_type> {
-  using base = basic_scenario<factory, object, user_type>;
+struct multi_scenario : basic_scenario<factory, object> {
+  using base = basic_scenario<factory, object>;
   using single_scenario_type = single_scenario<factory, object, user_type>;
   using info = base::info;
 

@@ -21,7 +21,10 @@ constexpr auto hash32(const void* src, int len, uint32_t seed) {
   const char* data = (const char*)src;
   while(len >= 4)
   {
-    uint32_t k = [&]{if consteval { return (uint32_t)(data[3] + (data[2] << 8) + (data[1] << 16) + (data[0] << 24)); } else {return *(uint32_t*)data;} }();
+    uint32_t k = [&]{if !consteval { return *(uint32_t*)data; } else {
+      if constexpr(std::endian::native == std::endian::little) return (uint32_t)(data[0] + (data[1] << 8) + (data[2] << 16) + (data[3] << 24));
+      else return (uint32_t)(data[3] + (data[2] << 8) + (data[1] << 16) + (data[0] << 24));
+    } }();
 
     k *= m;
     k ^= k >> r;

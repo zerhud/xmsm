@@ -41,7 +41,7 @@ constexpr auto add_mods(_type_c<trans_info<_from, _to, _event, _mods...>>, const
   return type_c<trans_info<_from, _to, _event, _mods..., adding...>>;
 }
 
-template<typename factory, typename object, typename user_type> struct basic_scenario {
+template<typename factory, typename object> struct basic_scenario {
   struct multi_sm_indicator;
   factory f;
 
@@ -60,6 +60,8 @@ template<typename factory, typename object, typename user_type> struct basic_sce
   }
   template<typename st> friend constexpr auto pick_def_state(const basic_scenario&) { return modificators::def_state<st>{}; }
   template<typename... e> friend constexpr auto stack_by_event(const basic_scenario&) { return modificators::stack_by_event<e...>{}; }
+  friend constexpr auto _true(const basic_scenario&){ return scenario_checker::_true{}; }
+  friend constexpr auto _false(const basic_scenario&){ return scenario_checker::_false{}; }
   template<typename s, typename... st> friend constexpr auto in(const basic_scenario&){ return scenario_checker::in<s, st...>{}; }
   template<typename s, typename... st> friend constexpr auto now_in(const basic_scenario&){ return scenario_checker::now_in<s, st...>{}; }
   template<typename e> friend constexpr auto stack_by_expr(const basic_scenario&, e) { return modificators::stack_by_expression<e>{}; }

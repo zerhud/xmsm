@@ -14,7 +14,7 @@
 namespace xmsm {
 
 template<typename factory, typename object, typename user_type> constexpr auto mk_scenario_base_type() {
-  if constexpr (basic_scenario<factory, object, user_type>::is_multi()) return type_c<multi_scenario<factory, object, user_type>>;
+  if constexpr (basic_scenario<factory, object>::is_multi()) return type_c<multi_scenario<factory, object, user_type>>;
   else return type_c<single_scenario<factory, object, user_type>>;
 }
 

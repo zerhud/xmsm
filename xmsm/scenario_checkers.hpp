@@ -13,6 +13,8 @@
 
 namespace xmsm::scenario_checker {
 
+struct _true {constexpr static bool is_checker = true;constexpr bool operator()(auto&&...) const {return true;}};
+struct _false {constexpr static bool is_checker = true;constexpr bool operator()(auto&&...) const {return false;}};
 template<typename sc, typename... st> struct in {
   constexpr static bool is_checker = true;
   constexpr static auto scenario = type_c<sc>;

@@ -39,8 +39,10 @@ constexpr void on_enter(ts1& s, state<1>&) { if (s.val++!=1) throw s.val; }
 
 static_assert( [] {
   xmsm::scenario<factory, ts1> s{factory{}};
-  return (s.states_count()==2) + 2*(s.events_count()==2) + 4*(s.index()==0) + 8*s.in_state<state<0>>() + 16*!s.is_stack_with_event_required();
-}() == 31);
+  return (s.states_count()==2) + 2*(s.events_count()==2) + 4*(s.index()==0)
+  + 8*s.in_state<state<0>>() + 16*!s.is_stack_with_event_required()
+  + 32*(s.cur_state_hash()==hash<factory>(xmsm::type_c<state<0>>));
+}() == 63);
 static_assert( [] {
   xmsm::scenario<factory, ts1> s{factory{}};
   s.on(event<0>{});
@@ -259,7 +261,9 @@ int main(int,char**) {
     s.on(event<100>{});
     if (s.own_state() != xmsm::scenario_state::fired) throw std::runtime_error(std::to_string(__LINE__));
     if (s.count()!=1) throw std::runtime_error(std::to_string(__LINE__));
+    if (!s.find_scenario(1)->in_state<state<0>>()) throw std::runtime_error(std::to_string(__LINE__));
     s.on(event<0>{});
+    if (!s.find_scenario(1)->in_state<state<1>>()) throw std::runtime_error(std::to_string(__LINE__));
     s.on(event<101>{});
     if (s.count()!=0) throw std::runtime_error(std::to_string(__LINE__));
   }

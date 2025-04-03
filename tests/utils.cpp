@@ -8,6 +8,8 @@
 
 #include "factory.hpp"
 
+#include <string>
+#include <stdexcept>
 #include <iostream>
 
 using namespace std::literals;
@@ -38,5 +40,11 @@ static_assert( xmsm::type_list{} << xmsm::type_c<base> << xmsm::type_c<child> ==
 static_assert( xmsm::type_list{} << xmsm::type_c<child> << xmsm::type_c<base> == xmsm::type_list<child,base>{} );
 
 int main(int,char**){
-  std::cout << "hash42(foo) == |" << hash64<tests::factory>(xmsm::type_c<foo>) << '|' << std::endl;
+  {
+    constexpr auto ct_hash = hash<tests::factory>(xmsm::type_c<tests::state<0>>);
+    auto rt_hash = hash<tests::factory>(xmsm::type_c<tests::state<0>>);
+    std::cout << "cmp ct and rt hashes: " << ct_hash << "==" << rt_hash << std::endl;
+    if (ct_hash!=rt_hash) throw std::runtime_error(std::to_string(__LINE__));
+  }
+  std::cout << "hash64(foo) == |" << hash64<tests::factory>(xmsm::type_c<foo>) << '|' << std::endl;
 }

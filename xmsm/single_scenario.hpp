@@ -22,8 +22,8 @@ struct stack_frame {
 struct fake_stack{ constexpr explicit fake_stack(const auto&){} };
 
 template<typename factory, typename object, typename user_type=object>
-struct single_scenario : basic_scenario<factory, object, user_type> {
-  using base = basic_scenario<factory, object, user_type>;
+struct single_scenario : basic_scenario<factory, object> {
+  using base = basic_scenario<factory, object>;
   using info = base::info;
 
   constexpr static auto all_trans_info() ;
@@ -71,7 +71,10 @@ struct single_scenario : basic_scenario<factory, object, user_type> {
   constexpr scenario_state own_state() const { return this->_own_state; }
   constexpr void reset_own_state() { _own_state=scenario_state::ready; }
   constexpr auto cur_state_hash() const {
-    return visit([](const auto& s) { return hash<factory>(find(all_states(), type_dc<decltype(s)>)); }, cur_state());
+    return unpack(all_states(), [&](auto... st) {
+      constexpr static decltype(hash<factory>(first(all_states()))) hashes[] = {hash<factory>(st)...};
+      return hashes[cur_state().index()];
+    });
   }
   template<typename self_type> constexpr auto&& cur_state(this self_type&& self) {
     if constexpr (!requires{self.stack.size();}) return self.state;
@@ -87,7 +90,7 @@ struct single_scenario : basic_scenario<factory, object, user_type> {
       if constexpr(is_stack_with_event_required()) clean_stack(e);
       auto cur_hash = cur_state_hash();
       foreach(all_trans_info(), [&](auto t) {
-        bool match = cur_hash==hash<factory>(decltype(+t)::from) && e_type == decltype(+t)::event;
+        bool match = cur_hash==hash<factory>(decltype(+t)::from) && e_type <= decltype(+t)::event;
         if constexpr(t().mod_only_if != type_c<>) match &= t().mod_only_if().expression(scenarios...);
         if (match) change_state<decltype(+t().to), decltype(+t)>(e);
         return match;
@@ -186,8 +189,8 @@ template<typename factory, typename object, typename user_type> constexpr auto s
   constexpr auto from_list = filter(info{}, [](auto i){return requires{i().is_from_state_mods;};});
   return unpack(tlist, [&](auto... transitions) {
     return (type_list{} << ... << [&](auto cur) {
-      auto cur_to_list = filter(to_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::to;});
-      auto cur_from_list = filter(from_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::from;});
+      constexpr auto cur_to_list = filter(to_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::to;});
+      constexpr auto cur_from_list = filter(from_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::from;});
       auto mods = [](auto l){return unpack(l, [](auto... i){return (type_list{} << ... << i().mods);});};
       return add_mods(add_mods(cur, mods(cur_to_list)), mods(cur_from_list));
     }(transitions));
