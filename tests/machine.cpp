@@ -37,7 +37,9 @@ struct ts_with_move_to {
 struct ts_with_try_move_to {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_trans<state<0>, state<2>, event<0>>(f, move_to<ts_with_move_to, state<2>, state<100>>(f))
+      , mk_trans<state<0>, state<2>, event<0>>(f, try_move_to<ts_with_move_to, state<2>>(f))
+      , mk_trans<state<2>, state<3>, event<1>>(f, try_move_to<ts_with_queue, state<100>>(f))
+      , mk_trans<state<0>, state<10>, event<10>>(f, move_to<ts_with_move_to, state<2>, state<100>>(f))
     );
   }
 };
@@ -47,6 +49,11 @@ using xm_ts_m = xmsm::scenario<factory, ts_with_move_to>;
 using xm_ts_t = xmsm::scenario<factory,  ts_with_try_move_to>;
 
 constexpr auto mk_s_queue(){struct{xm_ts_q q{factory{}}; xm_ts_m m{factory{}}; xm_ts_t t{factory{}};}ret; return ret;}
+static_assert( [] {
+  auto [s_q, s, s_t] = mk_s_queue();
+  s_t.on(event<10>{}, s, s_q);
+  return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>() + 4*s_t.in_state<state<10>>();
+}() == 7, "can handle chain of transitions" );
 static_assert( [] {
   auto [s_q, s, s_t] = mk_s_queue();
   s_t.on(event<0>{}, s, s_q);

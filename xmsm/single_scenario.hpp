@@ -89,7 +89,6 @@ struct single_scenario : basic_scenario<factory, object> {
     if constexpr(is_mod_when_requires()) while (exec_when(e, std::forward<decltype(scenarios)>(scenarios)...));
   }
   constexpr void on(const auto& e, auto&&... scenarios) {
-    on_other_scenarios_changed(e, scenarios...);
     constexpr auto e_type = type_dc<decltype(e)>;
     if constexpr (contains(all_events(), e_type)) {
       if constexpr(is_stack_with_event_required()) clean_stack(e);
@@ -97,7 +96,10 @@ struct single_scenario : basic_scenario<factory, object> {
       foreach(all_trans_info(), [&](auto t) {
         bool match = cur_hash==hash<factory>(decltype(+t)::from) && e_type <= decltype(+t)::event;
         if constexpr(t().mod_only_if != type_c<>) match &= t().mod_only_if().expression(scenarios...);
-        if (match && handle_move_to<decltype(+t)>(e, scenarios...)) change_state<decltype(+t().to), decltype(+t)>(e);
+        if (match && handle_move_to<decltype(+t)>(e, scenarios...)) {
+          change_state<decltype(+t().to), decltype(+t)>(e);
+          handle_try_move_to<decltype(+t)>(e, scenarios...);
+        }
         return match;
       });
     }
@@ -123,6 +125,17 @@ struct single_scenario : basic_scenario<factory, object> {
     });
   }
 private:
+  template<typename trans_info> constexpr bool handle_try_move_to(const auto& e, auto&&... scenarios) {
+    foreach(trans_info::mod_try_move_to, [&](auto mt) {
+      ([&](auto& s) {
+        bool f = s.own_hash() == hash<factory>(mt().scenario);
+        constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mt().state);
+        if (f) size(targets)==0 || unpack(targets, [&](auto... tgts){return s.template move_to<decltype(+tgts)...>(e, scenarios...);});
+      }(scenarios),...);
+      return false;
+    });
+    return true;
+  }
   template<typename trans_info> constexpr bool handle_move_to(const auto& e, auto&&... scenarios) {
     return !foreach(trans_info::mod_move_to, [&](auto mt) {
       constexpr auto mod = mt();

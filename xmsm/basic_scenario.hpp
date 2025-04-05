@@ -23,6 +23,7 @@ struct trans_info {
   consteval static auto all_mod_when() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_when;};}); }
   consteval static auto all_mod_only_if() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_only_if;};}); }
   consteval static auto all_mod_move_to() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_move_to;};}); }
+  consteval static auto all_mod_try_move_to() { return filter(type_list<_mods...>{}, [](auto v){return requires{decltype(+v){}.is_try_move_to;};}); }
 
   constexpr static bool is_trans_info = true;
   constexpr static bool is_queue_allowed = []{return size(filter(type_list<_mods...>{}, [](auto v){return v == type_c<modificators::allow_queue>;})) > 0;}();
@@ -35,6 +36,7 @@ struct trans_info {
   constexpr static auto mod_when = first(all_mod_when());
   constexpr static auto mod_only_if = first(all_mod_only_if());
   constexpr static auto mod_move_to = all_mod_move_to();
+  constexpr static auto mod_try_move_to = all_mod_try_move_to();
 
   static_assert( size(all_stack_by_event()) < 2, "only single stack by event modification is available for transition" );
 };
@@ -80,6 +82,7 @@ template<typename factory, typename object> struct basic_scenario {
   template<typename event> friend constexpr auto start_event(const basic_scenario&){ return modificators::start_event<event>{}; }
   friend constexpr auto allow_queue(const basic_scenario&) { return modificators::allow_queue{}; }
   template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
+  template<typename sc, typename st> friend constexpr auto try_move_to(const basic_scenario&) { return modificators::try_move_to<sc, st>{}; }
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
 
