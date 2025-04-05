@@ -75,8 +75,8 @@ struct multi_scenario : basic_scenario<factory, object> {
   }
   constexpr void reset_own_state() { foreach_scenario([](auto& s){s.reset_own_state();}); }
 
-  constexpr void on_address(const auto& e, const auto& id, auto&&... others) {
-    if (auto* s=find_scenario(id);s) s->on(e, others...);
+  constexpr void on_address(const auto& e, const auto& id, auto&&... scenarios) {
+    if (auto* s=find_scenario(id);s) s->on(e, scenarios...);
     clean_scenarios();
   }
   constexpr void on(const auto& e, auto&&... others) {

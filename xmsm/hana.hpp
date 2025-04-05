@@ -57,6 +57,11 @@ template<typename... items> constexpr auto index_of(const type_list<items...>&, 
   const bool found = ( false || ... || (++ind,type_c<items> <= item) );
   return (-1*!found) + ind*found;
 }
+template<typename factory, typename... items> constexpr auto index_of_by_hash(const type_list<items...>&, auto target_hash) {
+  auto ind=-1;
+  const bool found = (false || ... || (++ind,hash<factory>(type_c<items>)==target_hash));
+  return (-1*!found) + ind*found;
+}
 constexpr auto find(const auto& list, auto item) {
   return get<index_of(list, item)>(list);
 }
@@ -70,6 +75,10 @@ template<typename... items> constexpr auto filter(const type_list<items...>&, au
 template<typename... items> constexpr auto first(const type_list<items...>& l) {
   if constexpr(sizeof...(items)==0) return type_c<>;
   else return get<0>(l);
+}
+template<typename... items> constexpr auto last(const type_list<items...>& l) {
+  if constexpr(sizeof...(items)==0) return type_c<>;
+  else return get<sizeof...(items)-1>(l);
 }
 consteval auto max_min_size(auto&&... lists) {
   struct { unsigned max{}, min{}; constexpr bool operator=(unsigned v){ max = max*(max>=v) + v*(max<v); min = min*(min<=v) + min*(v<min); return true; } } ret;

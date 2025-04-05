@@ -34,7 +34,7 @@ struct trans_info {
   constexpr static auto mod_stack_by_expression = first(all_stack_by_expression());
   constexpr static auto mod_when = first(all_mod_when());
   constexpr static auto mod_only_if = first(all_mod_only_if());
-  constexpr static auto mod_move_to = first(all_mod_move_to());
+  constexpr static auto mod_move_to = all_mod_move_to();
 
   static_assert( size(all_stack_by_event()) < 2, "only single stack by event modification is available for transition" );
 };
@@ -85,6 +85,27 @@ template<typename factory, typename object> struct basic_scenario {
 
   constexpr static bool is_multi() {
     return first(info{}) == type_c<multi_sm_indicator>;
+  }
+
+  constexpr static auto all_trans_info() {
+    constexpr auto tlist = unpack(info{}, [](auto... info) {
+      return (type_list{} << ... << [](auto item) {
+        if constexpr (requires { decltype(+item)::is_trans_info; }) return item;
+        else return type_c<>;
+      }(info));
+    });
+    constexpr auto to_list = filter(info{}, [](auto i) { return requires { i().is_to_state_mods; }; });
+    constexpr auto from_list = filter(info{}, [](auto i) { return requires { i().is_from_state_mods; }; });
+    return unpack(tlist, [&](auto... transitions) {
+      return (type_list{} << ... << [&](auto cur) {
+        constexpr auto cur_to_list = filter(to_list, [&](auto to) { return decltype(+to)::st == decltype(+cur)::to; });
+        constexpr auto cur_from_list = filter(from_list, [&](auto to) {
+          return decltype(+to)::st == decltype(+cur)::from;
+        });
+        auto mods = [](auto l) { return unpack(l, [](auto... i) { return (type_list{} << ... << i().mods); }); };
+        return add_mods(add_mods(cur, mods(cur_to_list)), mods(cur_from_list));
+      }(transitions));
+    });
   }
 };
 

@@ -27,7 +27,8 @@ struct single_scenario : basic_scenario<factory, object> {
   using base = basic_scenario<factory, object>;
   using info = base::info;
 
-  constexpr static auto all_trans_info() ;
+  using base::all_trans_info;
+
   constexpr static bool is_stack_with_event_required() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_stack_by_event!=type_c<>)); }); }
   constexpr static bool is_stack_with_expression_required() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_stack_by_expression!=type_c<>)); }); }
   constexpr static bool is_mod_on_requires() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_on!=type_c<>)); }); }
@@ -66,8 +67,9 @@ struct single_scenario : basic_scenario<factory, object> {
   decltype(mk_states_type(std::declval<factory>())) state;
   [[no_unique_address]] decltype(mk_stack_type(std::declval<factory>())) stack;
   scenario_state _own_state{scenario_state::ready};
+  decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
 
-  constexpr explicit single_scenario(factory f) : base(std::move(f)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)) {}
+  constexpr explicit single_scenario(factory f) : base(std::move(f)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
 
   constexpr scenario_state own_state() const { return this->_own_state; }
   constexpr void reset_own_state() { _own_state=scenario_state::ready; }
@@ -82,10 +84,12 @@ struct single_scenario : basic_scenario<factory, object> {
     else return 0 < self.stack.size() ? self.stack.back().st : self.state;
   }
   constexpr void on_other_scenarios_changed(const auto& e, auto&&... scenarios) {
+    move_to_tracker.update(this, e, scenarios...);
     if constexpr(is_stack_with_expression_required()) clean_stack_by_expr(e, std::forward<decltype(scenarios)>(scenarios)...);
     if constexpr(is_mod_when_requires()) while (exec_when(e, std::forward<decltype(scenarios)>(scenarios)...));
   }
   constexpr void on(const auto& e, auto&&... scenarios) {
+    on_other_scenarios_changed(e, scenarios...);
     constexpr auto e_type = type_dc<decltype(e)>;
     if constexpr (contains(all_events(), e_type)) {
       if constexpr(is_stack_with_event_required()) clean_stack(e);
@@ -120,9 +124,8 @@ struct single_scenario : basic_scenario<factory, object> {
   }
 private:
   template<typename trans_info> constexpr bool handle_move_to(const auto& e, auto&&... scenarios) {
-    if constexpr (trans_info::mod_move_to==type_c<>) return true;
-    else {
-      constexpr auto mod = trans_info::mod_move_to();
+    return !foreach(trans_info::mod_move_to, [&](auto mt) {
+      constexpr auto mod = mt();
       bool fail = false;
       const bool found = (false || ... || [&](auto& s) {
         bool f = s.own_hash() == hash<factory>(mod.scenario);
@@ -132,8 +135,9 @@ private:
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);
       if (fail || !found) change_state<decltype(+mod.fail_state), trans_info>(e);
-      return !fail && found;
-    }
+      else move_to_tracker.activate(mt, scenarios...);
+      return !(!fail && found);
+    });
   }
   template<typename next_type, typename trans_info> constexpr void change_state(const auto& e) {
     _own_state = scenario_state::broken;
@@ -203,30 +207,11 @@ template<typename factory, typename object, typename user_type> constexpr auto s
   return list;
 }
 
-template<typename factory, typename object, typename user_type> constexpr auto single_scenario<factory, object, user_type>::all_trans_info() {
-  constexpr auto tlist = unpack(info{}, [](auto... info) {
-    return (type_list{} << ... << [](auto item){
-      if constexpr (requires{decltype(+item)::is_trans_info;}) return item;
-      else return type_c<>;
-    }(info));
-  });
-  constexpr auto to_list = filter(info{}, [](auto i){return requires{i().is_to_state_mods;};});
-  constexpr auto from_list = filter(info{}, [](auto i){return requires{i().is_from_state_mods;};});
-  return unpack(tlist, [&](auto... transitions) {
-    return (type_list{} << ... << [&](auto cur) {
-      constexpr auto cur_to_list = filter(to_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::to;});
-      constexpr auto cur_from_list = filter(from_list, [&](auto to){return decltype(+to)::st == decltype(+cur)::from;});
-      auto mods = [](auto l){return unpack(l, [](auto... i){return (type_list{} << ... << i().mods);});};
-      return add_mods(add_mods(cur, mods(cur_to_list)), mods(cur_from_list));
-    }(transitions));
-  });
-}
-
 template<typename factory, typename object, typename user_type> constexpr auto single_scenario<factory, object, user_type>::all_states() {
   auto def = filter(info{}, [](auto info){if constexpr(requires{decltype(+info)::is_def_state;}) return decltype(+info)::st; else return type_c<>;});
   static_assert( size(def) < 2, "few default states was picked to scenario" );
   auto list = unpack(all_trans_info(), [&](auto... states) {
-    constexpr auto find_fail_state = [](auto ti){if constexpr(ti().mod_move_to==type_c<>) return type_c<>; else return ti().mod_move_to().fail_state;};
+    constexpr auto find_fail_state = [](auto ti){return unpack(decltype(+ti)::mod_move_to, [](auto... mt){return (type_list{}<<...<<mt().fail_state);});};
     return ((((type_list{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to) << ... << find_fail_state(states));
   });
   static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );

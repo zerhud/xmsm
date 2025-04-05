@@ -43,11 +43,90 @@ template<typename target_t>  constexpr auto all_targets_for_move_to(auto tinfo, 
   return unpack(src, [](auto... seq){return (type_list{} << ... << pop_front(seq()));});
 }
 
-template<typename hash_type, auto count, auto max_size>
+template<typename factory, typename list, typename scenario, typename target_state>
 struct state_queue_tracker {
-  hash_type fail_state{};
-  hash_type hashes[count][max_size]{};
-  int indexes[count]{-1};
+  decltype(hash<factory>(type_c<int>)) fail_state{};
+  int indexes[size(list{})];
+
+  constexpr state_queue_tracker() { deactivate(); }
+
+  constexpr bool deactivate() {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]=-1)+...);}(std::make_index_sequence<size(list{})>{});}
+  constexpr bool is_active() const {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]>=0)+...);}(std::make_index_sequence<size(list{})>{});}
+  consteval static bool is_valid() {return size(list{})>0;}
+
+  constexpr static auto get_state(auto st_list, auto ind) {
+    return [&]<auto...inds>(std::index_sequence<inds...>){
+      return (0+...+((inds==ind)*hash<factory>(get<inds>(st_list))));
+    }(std::make_index_sequence<size(st_list)>{});
+  }
+  constexpr void activate(auto cur_hash) {
+    if (is_active()) return;
+    if (cur_hash==hash<factory>(last(first(list{})()))) {deactivate(); return;}
+    [&]<auto...inds>(std::index_sequence<inds...>){
+      (void) (0 + ... + [&](auto ind, auto st_list) {
+        return indexes[ind] = index_of_by_hash<factory>(st_list(), cur_hash);
+      }(inds, get<inds>(list{})));
+    }(std::make_index_sequence<size(list{})>{});
+  }
+  constexpr bool check_and_shift_state(auto ind, auto cur_hash) {
+    if (!is_active()) return true;
+    if (cur_hash==hash<factory>(last(first(list{})()))) {deactivate(); return true;}
+    return [&]<auto...inds>(std::index_sequence<inds...>){
+      return (0 + ... + [&](auto ind, auto st_list) {
+        if (indexes[ind]<0) return false;
+        const bool is_next_state = get_state(st_list(), indexes[ind]+1)==cur_hash;
+        indexes[ind] += is_next_state;
+        return is_next_state || get_state(st_list(), indexes[ind])==cur_hash ;
+      }(inds, get<inds>(list{})));
+    }(std::make_index_sequence<size(list{})>{});
+  }
+  template<typename tgt_sc, typename tgt_st> constexpr state_queue_tracker* search()requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state>){ return this; }
 };
+
+template<typename factory,typename base> struct final_tracker : base {
+  using bases = base::bases;
+  constexpr bool is_active() const { return unpack(bases{}, [this](auto... b){return (static_cast<const decltype(+b)*>(this)->is_active() + ...);});}
+  constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
+    constexpr auto move_to_list = unpack(decltype(+type_dc<decltype(*cur_scenario)>)::all_trans_info(), [](auto... i){return (type_list{}<<...<<decltype(+i)::mod_move_to);});
+    auto scenario_cur_hash = [&](auto scenario) { return (0+...+(others.cur_state_hash()*(hash<factory>(scenario)==others.own_hash()))); };
+    foreach(move_to_list, [&](auto mt) { if constexpr (requires{this->template search<decltype(+mt().scenario), decltype(+mt().state)>();}) {
+      auto& cur = *this->template search<decltype(+mt().scenario), decltype(+mt().state)>();
+      constexpr auto ind = index_of(move_to_list, mt);
+      if (!cur.check_and_shift_state(ind, scenario_cur_hash(mt().scenario))) cur_scenario->template move_to<decltype(+mt().fail_state)>(e, others...);
+      return false;
+    } else return false; });
+  }
+  constexpr void activate(auto mt, auto&&... scenarios) { if constexpr(requires{this->template search<decltype(+mt().scenario), decltype(+mt().state)>();}) {
+    this->template search<decltype(+mt().scenario), decltype(+mt().state)>()->activate(
+      (0+...+(scenarios.cur_state_hash()*(hash<factory>(mt().scenario)==scenarios.own_hash())))
+    );
+  }}
+};
+
+struct fake_state_queue_tracker {
+  constexpr static bool is_active() { return false; }
+  constexpr static void update(auto&&...){}
+  constexpr static void activate(auto mt, auto&&... scenarios) {}
+};
+
+template<typename factory, typename... others>
+constexpr auto mk_tracker(auto target_info) {
+  constexpr auto move_to_list = unpack(target_info, [](auto... i){return (type_list{} << ... << decltype(+i)::mod_move_to);});
+  if constexpr(size(move_to_list)==0) return fake_state_queue_tracker{};
+  else {
+    constexpr auto base_class_list = unpack(move_to_list, [](auto... mt) {
+      constexpr auto single = [](auto mt){ return mk_allow_queue_st(basic_scenario<factory, decltype(+mt().scenario)>::all_trans_info(), mt().state); };
+      auto list = (type_list{}<<...<<type_c<state_queue_tracker<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state)>>);
+      return filter(list, [](auto t){return decltype(+t)::is_valid();});
+    });
+    constexpr auto tracker = unpack(base_class_list, [&](auto... t) {
+      struct tracker : decltype(+t)... {
+        using bases = type_list<decltype(+t)...>;
+      };
+      return final_tracker<factory,tracker>{};
+    });
+    return tracker;
+  }
+}
 
 }
