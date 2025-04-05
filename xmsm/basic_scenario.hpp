@@ -99,7 +99,12 @@ template<typename factory, typename object> struct basic_scenario {
     });
     constexpr auto to_list = filter(info{}, [](auto i) { return requires { i().is_to_state_mods; }; });
     constexpr auto from_list = filter(info{}, [](auto i) { return requires { i().is_from_state_mods; }; });
-    return unpack(tlist, [&](auto... transitions) {
+    constexpr auto fail_states = unpack(info{}, [](auto... i){ return (type_list{} << ... << [](auto i) {
+      if constexpr(!requires{decltype(+i)::is_trans_info;}) return type_c<>;
+      else if constexpr(size(decltype(+i)::mod_move_to)==0) return type_c<>;
+      else return unpack(i().mod_move_to, [](auto... mt){return (type_list{}<<...<<mt().fail_state);});
+    }(i));});
+    constexpr auto user_ti = unpack(tlist, [&](auto... transitions) {
       return (type_list{} << ... << [&](auto cur) {
         constexpr auto cur_to_list = filter(to_list, [&](auto to) { return decltype(+to)::st == decltype(+cur)::to; });
         constexpr auto cur_from_list = filter(from_list, [&](auto to) {
@@ -108,6 +113,19 @@ template<typename factory, typename object> struct basic_scenario {
         auto mods = [](auto l) { return unpack(l, [](auto... i) { return (type_list{} << ... << i().mods); }); };
         return add_mods(add_mods(cur, mods(cur_to_list)), mods(cur_from_list));
       }(transitions));
+    });
+    return user_ti << unpack(fail_states, [](auto... fs) {
+      constexpr auto mk_ti = [](auto fail_st) {
+        constexpr auto mk_ti = [](auto from_st, auto info) {
+          return unpack(info().mods, [](auto... mods) {
+            return type_c<trans_info<decltype(+from_st), decltype(+fail_st), void, decltype(+mods)...>>;
+          });
+        };
+        constexpr auto with_from = unpack(decltype(from_list){}, [&](auto... from_st){return(type_list{}<<...<<mk_ti(from_st().st, from_st));});
+        constexpr auto with_to = unpack(decltype(to_list){}, [&](auto...to_st){return(type_list{}<<...<<mk_ti(type_c<>,to_st));});
+        return with_from << with_to;
+      };
+      return (type_list() << ... << mk_ti(fs));
     });
   }
 };

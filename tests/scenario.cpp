@@ -110,10 +110,11 @@ struct ts_with_expr_stack {
       , mk_trans<state<0>, state<1>, event<0>>(f, stack_by_event<event<10>>(f), stack_by_expr(f, in<ts1, state<0>>(f) && in<ts1_def1, state<0>,state<1>>(f)))
       , mk_trans<state<1>, state<2>, event<1>>(f, stack_by_event<event<11>, event<12>>(f), stack_by_expr(f, in<ts1, state<1>>(f)))
       , mk_trans<state<1>, state<3>, event<2>>(f)
+      , mk_trans<state<2>, state<4>, event<3>>(f, stack_by_expr(f, in<ts1, state<1>>(f)))
     );
   }
 };
-constexpr void on_enter(ts_with_expr_stack& s, state<2>&) { s.val = 3; }
+constexpr void on_enter(const auto& f, ts_with_expr_stack& s, state<2>&) { static_assert(std::is_same_v<std::decay_t<decltype(f)>, factory>); s.val = 3; }
 constexpr void on_exit(ts_with_expr_stack& s, state<2>&) { s.val = 21 / (s.val / (s.val==3)); }
 static_assert( [] {
   xmsm::scenario<factory, ts1> s_ts1{factory{}};
@@ -132,6 +133,13 @@ static_assert( [] {
   s.on_other_scenarios_changed(e, s_ts1);
   return s.obj.val;
 }() == 7 );
+static_assert( [] {
+  xmsm::scenario<factory, ts_with_expr_stack> s{factory{}};
+  s.on(event<0>{});
+  s.on(event<1>{});
+  s.on(event<3>{});
+  return s.stack_size();
+}() == 3 );
 
 struct ts_with_on {
   int val{};

@@ -60,16 +60,32 @@ template<typename type> constexpr bool test_var_in_state(const auto& v) {
   else return visit([]<typename inner>(const inner&){ return type_c<inner> == type_c<type>; }, v);
 }
 
-constexpr void call_on_exit(auto& scenario, auto& state, const auto& event) {
-  //TODO: try to call member function first
-  if constexpr(requires{on_exit(scenario, state, event);}) on_exit(scenario, state, event);
+constexpr void call_on_exit(const auto& factory, auto& scenario, auto& state, const auto& event) {
+  if constexpr(requires{scenario.on_exit(factory, state, event);}) scenario.on_exit(factory, state, event);
+  else if constexpr(requires{scenario.onExit(factory, state, event);}) scenario.onExit(factory, state, event);
+  else if constexpr(requires{on_exit(factory, scenario, state, event);}) on_exit(factory, scenario, state, event);
+  else if constexpr(requires{on_exit(factory, scenario, state);}) on_exit(factory, scenario, state);
+  else if constexpr(requires{onExit(factory, scenario, state, event);}) onExit(factory, scenario, state, event);
+  else if constexpr(requires{OnExit(factory, scenario, state);}) OnExit(factory, scenario, state);
+  // and without factory
+  else if constexpr(requires{scenario.on_exit(state, event);}) scenario.on_exit(state, event);
+  else if constexpr(requires{scenario.onExit(state, event);}) scenario.onExit(state, event);
+  else if constexpr(requires{on_exit(scenario, state, event);}) on_exit(scenario, state, event);
   else if constexpr(requires{on_exit(scenario, state);}) on_exit(scenario, state);
   else if constexpr(requires{onExit(scenario, state, event);}) onExit(scenario, state, event);
   else if constexpr(requires{OnExit(scenario, state);}) OnExit(scenario, state);
 }
-constexpr void call_on_enter(auto& scenario, auto& state, const auto& event) {
-  //TODO: try to call member function first
-  if constexpr(requires{on_enter(scenario, state, event);}) on_enter(scenario, state, event);
+constexpr void call_on_enter(const auto& factory, auto& scenario, auto& state, const auto& event) {
+  if constexpr(requires{scenario.on_enter(factory, state, event);}) scenario.on_enter(factory, state, event);
+  else if constexpr(requires{scenario.onEnter(factory, state, event);}) scenario.onEnter(factory, state, event);
+  else if constexpr(requires{on_enter(factory, scenario, state, event);}) on_enter(factory, scenario, state, event);
+  else if constexpr(requires{on_enter(factory, scenario, state);}) on_enter(factory, scenario, state);
+  else if constexpr(requires{onEnter(factory, scenario, state, event);}) onEnter(factory, scenario, state, event);
+  else if constexpr(requires{OnEnter(factory, scenario, state);}) OnEnter(factory, scenario, state);
+// and without factory
+  else if constexpr(requires{scenario.on_enter(state, event);}) scenario.on_enter(state, event);
+  else if constexpr(requires{scenario.onEnter(state, event);}) scenario.onEnter(state, event);
+  else if constexpr(requires{on_enter(scenario, state, event);}) on_enter(scenario, state, event);
   else if constexpr(requires{on_enter(scenario, state);}) on_enter(scenario, state);
   else if constexpr(requires{onEnter(scenario, state, event);}) onEnter(scenario, state, event);
   else if constexpr(requires{OnEnter(scenario, state);}) OnEnter(scenario, state);

@@ -12,13 +12,15 @@
 
 namespace xmsm::modificators {
 
+template<typename type> concept check_expression = requires{type::is_checker;};
+
 struct allow_queue {};
 template<typename e, typename... tail> struct stack_by_event {
   constexpr static bool is_stack_by_event = true;
   constexpr static auto back_events = (type_list<e>{} << ... << type_c<tail>) ;
 };
 
-template<typename e> struct stack_by_expression {
+template<check_expression e> struct stack_by_expression {
   constexpr static bool is_stack_by_expression = true;
   constexpr static auto expression = type_c<e>;
 };
@@ -46,8 +48,8 @@ template<typename type, typename... _mods> struct from_state_mods {
   constexpr static auto mods = type_list<_mods...>{};
 };
 
-template<typename e> struct when { constexpr static bool is_when = true; constexpr static e expression{}; };
-template<typename e> struct only_if { constexpr static bool is_only_if = true; constexpr static e expression{}; };
+template<check_expression e> struct when { constexpr static bool is_when = true; constexpr static e expression{}; };
+template<check_expression e> struct only_if { constexpr static bool is_only_if = true; constexpr static e expression{}; };
 
 template<typename sc, typename st, typename fst> struct move_to {
   constexpr static bool is_move_to = true;

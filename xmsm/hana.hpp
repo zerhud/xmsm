@@ -85,6 +85,10 @@ consteval auto max_min_size(auto&&... lists) {
   (void)( true && ... && (ret=size(lists)) );
   return ret;
 }
+consteval auto max_size(auto&&... lists) {
+  auto [max,min] = max_min_size(std::forward<decltype(lists)>(lists)...);
+  return max;
+}
 
 template<typename factory, typename type> constexpr auto name(_type_c<type>) {
   using sv = factory::string_view;
