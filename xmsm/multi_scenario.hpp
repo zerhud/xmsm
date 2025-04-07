@@ -63,6 +63,10 @@ struct multi_scenario : basic_scenario<factory, object> {
   constexpr auto count() const { return scenarios.size(); }
   template<typename st> constexpr auto count_in() const { auto ret = 0; foreach_scenario([&](const auto& s){ret+=in_state<st>(s);}); return ret; }
   constexpr bool empty() const { return scenarios.empty(); }
+  template<typename id_type> constexpr user_type* find(const id_type& id) {
+    auto* s = find_scenario(id);
+    return s ? &s->obj : nullptr;
+  }
   template<typename id_type> constexpr single_scenario_type* find_scenario(const id_type& id) {
     return xmsm_find_pointer(this->f, scenarios, id);
   }
@@ -82,7 +86,7 @@ struct multi_scenario : basic_scenario<factory, object> {
   constexpr void on(const auto& e, auto&&... others) {
     if constexpr (!contains(start_events(), type_dc<decltype(e)>)) foreach_scenario([&](auto& s){s.on(e, others...);});
     else {
-      auto& [_,s] = xmsm_insert_or_emplace( scenarios, user_id_gen(e), single_scenario_type{this->f} );
+      auto& [_,s] = xmsm_insert_or_emplace( scenarios, user_id_gen(e), single_scenario_type{this->f, create_object<user_type>(this->f)} );
       s._own_state = scenario_state::fired;
     }
     clean_scenarios();
@@ -90,6 +94,22 @@ struct multi_scenario : basic_scenario<factory, object> {
   constexpr void on_other_scenarios_changed(const auto& e, auto&&... others) {
     foreach_scenario([&](auto& s){s.on_other_scenarios_changed(e, others...);});
     clean_scenarios();
+  }
+  template<typename... targets> constexpr bool move_to(const auto& e, auto&&... scenarios) {
+    bool ret = true;
+    foreach_scenario([&](auto& s){ret &= s.template move_to<targets...>(e, scenarios...);});
+    clean_scenarios();
+    return ret;
+  }
+  constexpr auto cur_state_hash() const {
+    using hash_type = decltype(std::declval<single_scenario_type>().cur_state_hash());
+    hash_type ret{};
+    if (!empty()) {
+      auto&[_,first_scenario] = *begin(scenarios);
+      ret = first_scenario.cur_state_hash();
+      foreach_scenario([&](auto& s){ret *= ret==s.cur_state_hash();});
+    }
+    return ret;
   }
 private:
   template<typename self_type> constexpr void foreach_scenario(this self_type& self, auto&& fnc) {

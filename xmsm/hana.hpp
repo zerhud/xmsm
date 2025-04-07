@@ -118,12 +118,20 @@ template<typename type, auto ind> struct tuple_value {
 };
 constexpr auto mk_tuple(auto&&... items) {
   return [&]<auto... inds>(std::index_sequence<inds...>){
-    struct tuple_storage : tuple_value<decltype(items), inds>... {
-      using tuple_value<decltype(items), inds>::g...;
+    struct tuple_storage : tuple_value<std::decay_t<decltype(items)>, inds>... {
+      using tuple_value<std::decay_t<decltype(items)>, inds>::g...;
       constexpr decltype(sizeof...(items)) size() const { return sizeof...(items); }
     };
     return tuple_storage{std::forward<decltype(items)>(items)...};
   }(std::make_index_sequence<sizeof...(items)>{});
+}
+
+constexpr auto size(const auto& obj) requires requires{obj.size();} { return obj.size(); }
+constexpr auto foreach(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
+  return [&]<auto...inds>(std::index_sequence<inds...>){ return (false||...||fnc(get<inds>(obj))); }(std::make_index_sequence<size(obj)>{});
+}
+constexpr auto unpack(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
+  return [&]<auto...inds>(std::index_sequence<inds...>){ return fnc(get<inds>(obj)...); }(std::make_index_sequence<size(obj)>{});
 }
 
 constexpr auto has_duplicates(auto&&... items) {

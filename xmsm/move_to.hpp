@@ -9,6 +9,7 @@
  *************************************************************************/
 
 #include "hana.hpp"
+#include "utils.hpp"
 
 namespace xmsm {
 
@@ -82,8 +83,8 @@ struct state_queue_tracker {
   template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker* search()
   requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
-    auto scenario_cur_hash = [&](auto sc) { return (0+...+(others.cur_state_hash()*(hash<factory>(sc)==others.own_hash()))); };
-    if (!check_and_shift_state(scenario_cur_hash(type_c<scenario>))) cur_scenario->template force_move_to<fail_state>(e, others...);
+    auto scenario_cur_hash  = utils::cur_state_hash_from_set<factory, scenario>(others...);
+    if (!check_and_shift_state(scenario_cur_hash)) cur_scenario->template force_move_to<fail_state>(e, others...);
   }
 };
 

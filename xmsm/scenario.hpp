@@ -22,6 +22,7 @@ template<typename factory, typename object, typename user_type=object>
 struct scenario : decltype(+mk_scenario_base_type<factory, object, user_type>()) {
   using base = decltype(+mk_scenario_base_type<factory, object, user_type>());
   constexpr explicit scenario(factory f) : base(std::move(f)) {}
+  constexpr explicit scenario(factory f, user_type uo) : base(std::move(f), std::move(uo)) {}
 };
 
 }

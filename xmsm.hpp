@@ -8,7 +8,7 @@
  * or <http://www.gnu.org/licenses/> for details
  *************************************************************************/
 
-#include "xmsm/scenario.hpp"
+#include "xmsm/machine.hpp"
 
 namespace xmsm {
 }

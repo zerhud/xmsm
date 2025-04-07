@@ -65,9 +65,10 @@ struct single_scenario : basic_scenario<factory, object> {
   decltype(mk_states_type(std::declval<factory>())) state;
   [[no_unique_address]] decltype(mk_stack_type(std::declval<factory>())) stack;
   scenario_state _own_state{scenario_state::ready};
-  decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
+  [[no_unique_address]] decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
 
-  constexpr explicit single_scenario(factory f) : base(std::move(f)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
+  constexpr explicit single_scenario(factory f) : single_scenario(std::move(f), user_type{}) {}
+  constexpr explicit single_scenario(factory f, user_type uo) : base(std::move(f)), obj(std::move(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
 
   constexpr scenario_state own_state() const { return this->_own_state; }
   constexpr void reset_own_state() { _own_state=scenario_state::ready; }

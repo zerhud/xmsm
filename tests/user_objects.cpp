@@ -43,6 +43,18 @@ struct ts_with_move_to {
   }
 };
 struct ts_with_queue_user : ts_with_queue {int val{};};
+struct ts_multi {
+  static auto describe_sm(const auto& f) {
+    return mk_multi_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f, when(f, now_in<ts_with_queue, state<2>>(f)))
+      , mk_qtrans<state<1>, state<2>>(f)
+      , mk_trans<state<2>, state<1000>, event<10>>(f)
+      , finish_state<state<1000>>(f), start_event<event<100>>(f)
+    );
+  }
+};
+struct ts_multi_user : ts_multi { constexpr explicit ts_multi_user(int,int){} int val1{1}, val2{2}; };
+template<typename type> constexpr auto create(const factory& f) requires std::is_same_v<type,ts_multi_user> { return ts_multi_user(0,0); }
 constexpr auto mk_sc() {
   struct {
     xmsm::scenario<factory, ts_with_queue, ts_with_queue_user> q{factory{}};
@@ -77,6 +89,12 @@ static_assert( [] {
   if (!q.in_state<state<100>>()) throw __LINE__;
   return visit([](auto&v){if constexpr(requires{v.val100;})return v.val100;else return 0;}, q.cur_state());
 }() == 100, "the replaced type used as fail state" );
+
+static_assert( [] {
+  xmsm::scenario<factory, ts_multi, ts_multi_user> s{factory{}};
+  s.on(event<100>{});
+  return (s.find(1)->val1==1) + 2*(s.find(1)->val2==2);
+}() == 3 );
 
 int main(int,char**){
 }

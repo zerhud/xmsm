@@ -42,7 +42,7 @@ constexpr auto& xmsm_insert_or_emplace(auto& obj, auto&& key, auto&& val) {
   }
 }
 
-template<typename type> constexpr auto create_state(const auto& f) {
+template<typename type> constexpr auto create_object(const auto& f) {
   if constexpr(requires{create<type>(f);}) return create<type>(f);
   else if constexpr(requires{Create<type>(f);}) return Create<type>(f);
   else if constexpr(requires{type{f};}) return type{f};
@@ -52,7 +52,7 @@ template<typename type> constexpr auto create_state(const auto& f, const auto& e
   if constexpr(requires{create<type>(f, event);}) return create<type>(f, event);
   else if constexpr(requires{Create<type>(f, event);}) return Create<type>(f, event);
   else if constexpr(requires{type{f, event};}) return type{f, event};
-  else return create_state<type>(f);
+  else return create_object<type>(f);
 }
 
 template<typename type> constexpr bool test_var_in_state(const auto& v) {
