@@ -25,6 +25,7 @@ template<typename l, typename r> constexpr bool operator<=(_type_c<l> ll, _type_
 template<typename l, typename r> constexpr bool operator>=(_type_c<l> ll, _type_c<r> rr) { return __is_base_of(r, l); }
 template<typename l> constexpr bool operator<=(_type_c<l> ll, _type_c<l> rr) { return true; }
 template<typename l> constexpr bool operator>=(_type_c<l> ll, _type_c<l> rr) { return true; }
+template<typename t> concept is_type_c = requires{ []<typename i>(_type_c<i>){}(t{}); };
 template<typename...> struct type_list{};
 template<typename... l, typename... r> constexpr bool operator==(type_list<l...>, type_list<r...>) { return false; }
 template<typename... c> constexpr bool operator==(type_list<c...>, type_list<c...>) { return true; }

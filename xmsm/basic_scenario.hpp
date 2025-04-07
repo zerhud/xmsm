@@ -83,11 +83,19 @@ template<typename factory, typename object> struct basic_scenario {
   friend constexpr auto allow_queue(const basic_scenario&) { return modificators::allow_queue{}; }
   template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
   template<typename sc, typename st> friend constexpr auto try_move_to(const basic_scenario&) { return modificators::try_move_to<sc, st>{}; }
+  template<typename type> friend constexpr auto mk_change(const basic_scenario&) { return type_c<type>; }
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
 
   constexpr static bool is_multi() {
     return first(info{}) == type_c<multi_sm_indicator>;
+  }
+
+  constexpr auto ch_type(auto from) const {
+    if constexpr(!requires{ change_type<int>(f, *this); }) return from;
+    else if constexpr(is_type_c<decltype(change_type<decltype(+from)>(f, *this))>)
+      return change_type<decltype(+from)>(f, *this);
+    else return from;
   }
 
   constexpr static auto all_trans_info() {

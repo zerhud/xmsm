@@ -23,6 +23,10 @@ static_assert( hash<tests::factory>(xmsm::type_c<foo>) == 2414502773, "the murmu
 static_assert( xmsm::type_c<foo> == xmsm::type_c<foo> );
 static_assert( xmsm::type_c<int> != xmsm::type_c<foo> );
 static_assert( xmsm::type_c<decltype(xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<>)> == xmsm::type_c<xmsm::type_list<int>> );
+static_assert( xmsm::is_type_c<decltype([]{return xmsm::type_c<>;}())> );
+static_assert( xmsm::is_type_c<decltype([]{return xmsm::type_c<int>;}())> );
+static_assert( !xmsm::is_type_c<decltype([]{return int{};}())> );
+static_assert( !xmsm::is_type_c<decltype([]{}())> );
 
 static_assert( xmsm::has_duplicates(1,2,3) == 0 );
 static_assert( xmsm::has_duplicates(1,2,1) == 1 );

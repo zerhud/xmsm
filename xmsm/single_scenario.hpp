@@ -38,7 +38,8 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr static auto all_events() ;
   constexpr static auto mk_states_type(const auto& f) {
     return unpack(all_states(), [&]([[maybe_unused]] auto... states) {
-      return mk_variant< decltype(+states)... >(f);
+      static_assert( size(all_states()) == size((type_list{}<<...<<decltype(std::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
+      return mk_variant< decltype(+std::declval<base>().ch_type(states))... >(f);
     });
   }
   constexpr static auto mk_stack_type(const auto& f) {
@@ -91,7 +92,7 @@ struct single_scenario : basic_scenario<factory, object> {
       if constexpr(is_stack_with_event_required()) clean_stack(e);
       auto cur_hash = cur_state_hash();
       foreach(all_trans_info(), [&](auto t) {
-        const bool match = cur_hash==hash<factory>(decltype(+t)::from) && e_type <= decltype(+t)::event;
+        const bool match = cur_hash==hash<factory>(decltype(+t)::from) && decltype(+t)::event <= e_type;
         return match && (exec_trans<decltype(+t)>(e, scenarios...)&trans_check_result::only_if)==0;
       });
     }
@@ -150,8 +151,9 @@ private:
       return !(!fail && found);
     });
   }
-  template<typename next_type, typename trans_info=trans_info<void,void,void>> constexpr void change_state(const auto& e) {
+  template<typename _next_type, typename trans_info=trans_info<void,void,void>> constexpr void change_state(const auto& e) {
     _own_state = scenario_state::broken;
+    using next_type = decltype(+this->ch_type(type_c<_next_type>));
     auto next = create_state<next_type>(this->f, e);
     visit([&](auto& s) { call_on_exit(this->f, obj, s, e); }, cur_state());
     call_on_enter(this->f, obj, make_next_state<next_type>(trans_info{}, next), e);
