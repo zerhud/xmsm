@@ -23,6 +23,11 @@ struct ts_with_queue {
       , mk_qtrans<state<6>, state<5>, event<5>>(f)
       , mk_trans<state<0>, state<100>, event<100>>(f)
       , mk_trans<state<1>, state<100>, event<101>>(f)
+      , mk_trans<state<5>, state<100>, event<100>>(f)
+      , mk_trans<state<1>, state<0>, event<0>>(f)
+      , mk_trans<state<2>, state<0>, event<0>>(f)
+      , mk_trans<state<2>, state<6>, event<6>>(f)
+      , mk_trans<state<100>, state<0>, event<0>>(f)
     );
   }
 };
@@ -31,6 +36,8 @@ struct ts_with_move_to {
     return mk_sm_description(f
       , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<100>, state<101>>(f))
       , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
+      , mk_trans<state<2>, state<0>, event<0>>(f)
+      , mk_trans<state<100>, state<0>, event<0>>(f)
     );
   }
 };
@@ -98,6 +105,24 @@ static_assert( [] {
   s.move_to<state<100>>(event<100>{}, s_q, s_t);
   return s.in_state<state<0>>();
 }() );
+static_assert( [] {
+  auto [s_q, s, s_t] = mk_s_queue();
+  s.on(event<1>{}, s_q, s_t);
+  s_q.on(event<101>{}, s, s_t); s.on_other_scenarios_changed(event<101>{}, s_q, s_t);
+  s.on(event<0>{}, s_q, s_t);
+  if (!s.in_state<state<0>>()) throw __LINE__;
+  s_q.on(event<0>{}, s_q, s_t); s.on_other_scenarios_changed(event<0>{}, s_q, s_t);
+  if (!s.in_state<state<0>>()) throw __LINE__;
+  if (!s_q.in_state<state<0>>()) throw __LINE__;
+  s_q.on(event<100>{}, s_q, s_t); s.on_other_scenarios_changed(event<0>{}, s_q, s_t);
+  return s.in_state<state<0>>() + 2*s_q.in_state<state<100>>();
+}() == 3, "deactivate queue after fail" );
+static_assert( [] {
+  auto [s_q, s, s_t] = mk_s_queue();
+  s.on(event<1>{}, s_q, s_t);
+  s_q.on(event<0>{}, s, s_t); s.on_other_scenarios_changed(event<0>{}, s_q, s_t);
+  return s.in_state<state<100>>();
+}() == true, "cannot backward state" );
 
 
 struct ts_with_queue2 {

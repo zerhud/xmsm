@@ -39,6 +39,7 @@ template<typename... items, typename... checks> constexpr bool contains(const ty
 }
 template<typename... l, typename r> constexpr auto operator+(const type_list<l...>&, _type_c<r>) { return type_list<l..., r>{}; }
 template<typename... l, typename... r> constexpr auto operator+(const type_list<l...>&, const type_list<r...>&) { return type_list<l..., r...>{}; }
+template<typename... l, typename r> constexpr auto operator%(const type_list<l...>&, _type_c<r>) { return type_list<r, l...>{}; }
 template<typename... items, typename type> constexpr auto operator<<(const type_list<items...>& l, _type_c<type> t) {
   if constexpr (t == type_c<> || contains(l, t)) return l;
   else return type_list<items..., type>{};
@@ -46,6 +47,7 @@ template<typename... items, typename type> constexpr auto operator<<(const type_
 template<typename... left, typename... right> constexpr auto operator<<(const type_list<left...>& l, const type_list<right...>&) {
   return (l << ... << type_c<right>);
 }
+template<typename... items> constexpr auto revert(const type_list<items...>&) {return (type_list{} % ... % type_c<items>);}
 template<typename... items> constexpr auto unpack(const type_list<items...>&, auto&& fnc) {
   return fnc(type_c<items>...);
 }

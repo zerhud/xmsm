@@ -87,9 +87,11 @@ template<typename factory, typename object> struct basic_scenario {
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
 
-  constexpr static bool is_multi() {
-    return first(info{}) == type_c<multi_sm_indicator>;
-  }
+  constexpr static bool is_multi() { return first(info{}) == type_c<multi_sm_indicator>; }
+  constexpr static bool is_finish_state(auto st) { return unpack(info{}, [](auto... i){return (0+...+[](auto i) {
+    if constexpr (requires{i().is_finish_state;}) return i().st==decltype(st){};
+    else return 0;
+  }(i));});}
 
   constexpr auto ch_type(auto from) const {
     if constexpr(!requires{ change_type<int>(f, *this); }) return from;

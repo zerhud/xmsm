@@ -111,13 +111,13 @@ struct multi_scenario : basic_scenario<factory, object> {
     }
     return ret;
   }
-private:
   template<typename self_type> constexpr void foreach_scenario(this self_type& self, auto&& fnc) {
     for (auto& entry : self.scenarios) {
       auto& [_,scenario] = entry;
       fnc(scenario);
     }
   }
+private:
   constexpr void clean_scenarios() {
     xmsm_erase_if(this->f, scenarios, [](const auto& i) { auto& [_,s] = i; return in_state(s, finish_state()); });
   }

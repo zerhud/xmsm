@@ -49,10 +49,12 @@ struct state_queue_tracker {
   int indexes[size(list{})];
 
   constexpr state_queue_tracker() { deactivate(); }
+  consteval static bool is_valid() {return size(list{})>0;}
 
+  template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker* search()
+  requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
   constexpr bool deactivate() {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]=-1)+...);}(std::make_index_sequence<size(list{})>{});}
   constexpr bool is_active() const {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]>=0)+...);}(std::make_index_sequence<size(list{})>{});}
-  consteval static bool is_valid() {return size(list{})>0;}
 
   constexpr static auto get_state(auto st_list, auto ind) {
     return [&]<auto...inds>(std::index_sequence<inds...>){
@@ -61,7 +63,7 @@ struct state_queue_tracker {
   }
   constexpr void activate(auto cur_hash) {
     if (is_active()) return;
-    if (cur_hash==hash<factory>(last(first(list{})()))) {deactivate(); return;}
+    if (cur_hash==hash<factory>(last(first(list{})()))) return;
     [&]<auto...inds>(std::index_sequence<inds...>){
       (void) (0 + ... + [&](auto ind, auto st_list) {
         return indexes[ind] = index_of_by_hash<factory>(st_list(), cur_hash);
@@ -80,11 +82,89 @@ struct state_queue_tracker {
       }(inds, get<inds>(list{})));
     }(std::make_index_sequence<size(list{})>{});
   }
-  template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker* search()
-  requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
+    static_assert( !basic_scenario<factory, scenario>::is_multi() );
     auto scenario_cur_hash  = utils::cur_state_hash_from_set<factory, scenario>(others...);
-    if (!check_and_shift_state(scenario_cur_hash)) cur_scenario->template force_move_to<fail_state>(e, others...);
+    if (!check_and_shift_state(scenario_cur_hash)) {
+      cur_scenario->template force_move_to<fail_state>(e, others...);
+      deactivate();
+    }
+  }
+};
+
+template<typename factory, typename list, typename scenario, typename target_state, typename fail_state>
+struct state_queue_tracker_multi {
+  int indexes[3] = {0,-1,0}; // sum, max_steps, n
+
+  consteval static bool is_valid() {return size(list{})>0;}
+
+  template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker_multi* search()
+  requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
+  constexpr bool deactivate() {return indexes[0]=0, indexes[1]=-1, indexes[2]=0; }
+  constexpr bool is_active() const {return indexes[1]>0;}
+  constexpr auto count_to_end(auto h, auto _st_list) {
+    auto st_list = revert(_st_list);
+    return [&]<auto... inds>(std::index_sequence<inds...>){
+      return (0+...+( inds*(hash<factory>(get<inds>(st_list))==h) ));
+    }(std::make_index_sequence<size(st_list)>{});
+  }
+  constexpr auto scenario_maximum(const auto& s) {
+    auto cur_hash = s.cur_state_hash();
+    auto cur_max = 0;
+    [&]<auto... inds>(std::index_sequence<inds...>){
+      ([&](auto ind, auto st_list) {
+        auto cur = count_to_end(cur_hash, st_list());
+        cur_max = cur*(cur_max<cur);
+      }(inds, get<inds>(list{})), ...);
+    }(std::make_index_sequence<size(list{})>{});
+    return cur_max;
+  }
+  constexpr void activate(const auto& ms) {
+    if (is_active()) return;
+    indexes[2] = ms.count();
+    if (indexes[2]==0) return ;
+    ms.foreach_scenario([this](const auto&s) {
+      auto cur_max = scenario_maximum(s);
+      indexes[1] = cur_max*(indexes[1]<cur_max);
+      indexes[0] += cur_max;
+    });
+  }
+  template<typename other_scenario, typename user_type> constexpr bool update(const xmsm::scenario<factory, other_scenario, user_type>& s) {
+    return false;
+  }
+  template<typename user_type> constexpr bool update(const xmsm::scenario<factory, scenario, user_type>& s) {
+    int max = 0, sum = 0;
+    s.foreach_scenario([&](const auto&s) {
+      auto cur_max = scenario_maximum(s);
+      max = max*(max>cur_max) + cur_max*(max<=cur_max);
+      sum += cur_max;
+      indexes[0] *= cur_max>0;
+    });
+    indexes[0] = indexes[0]*(indexes[0]<=sum) + sum*(sum<indexes[0]);
+    indexes[1] = indexes[1]*(indexes[1]<=max) + max*(max<indexes[1]);
+    return !(indexes[0]>0 && sum <= indexes[0] && max <= indexes[1]);
+  }
+  constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
+    if (!is_active()) return;
+    if constexpr (!basic_scenario<factory,scenario>::is_finish_state(type_c<target_state>)) {
+      if (utils::count_from_set<factory,scenario>(others...) < indexes[2]) {
+        fail(cur_scenario, e, others...);
+        return;
+      }
+    }
+    else {
+      if (utils::count_from_set<factory,scenario>(others...)==0) {
+        deactivate();
+        return;
+      }
+    }
+    if ((false||...||update(others))) {
+      fail(cur_scenario, e, others...);
+    }
+  }
+  constexpr auto fail(auto* cur_scenario, const auto& e, auto&&... others) {
+    cur_scenario->template force_move_to<fail_state>(e, others...);
+    deactivate();
   }
 };
 
@@ -95,8 +175,9 @@ template<typename factory,typename base> struct final_tracker : base {
     foreach(bases{}, [&](auto cur_base){static_cast<decltype(+cur_base)*>(this)->update(cur_scenario, e, others...);return false;});
   }
   constexpr void activate(auto mt, auto&&... scenarios) { if constexpr(requires{this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();}) {
-    this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>()->activate(
-      (0+...+(scenarios.cur_state_hash()*(hash<factory>(mt().scenario)==scenarios.own_hash())))
+    auto* self = this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();
+    if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi()) self->activate(utils::search_scenario(mt().scenario, scenarios...));
+    else self->activate(utils::cur_state_hash_from_set<factory, decltype(+mt().scenario)>(scenarios...)
     );
   }}
 };
@@ -107,14 +188,19 @@ struct fake_state_queue_tracker {
   constexpr static void activate(auto mt, auto&&... scenarios) {}
 };
 
+template<typename factory> constexpr auto mk_tracker_base_class(auto mt) {
+  constexpr auto single = [](auto mt){ return mk_allow_queue_st(basic_scenario<factory, decltype(+mt().scenario)>::all_trans_info(), mt().state); };
+  if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi())
+    return type_c<state_queue_tracker_multi<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>>;
+  else return type_c<state_queue_tracker<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>>;
+}
 template<typename factory, typename... others>
 constexpr auto mk_tracker(auto target_info) {
   constexpr auto move_to_list = unpack(target_info, [](auto... i){return (type_list{} << ... << decltype(+i)::mod_move_to);});
   if constexpr(size(move_to_list)==0) return fake_state_queue_tracker{};
   else {
     constexpr auto base_class_list = unpack(move_to_list, [](auto... mt) {
-      constexpr auto single = [](auto mt){ return mk_allow_queue_st(basic_scenario<factory, decltype(+mt().scenario)>::all_trans_info(), mt().state); };
-      auto list = (type_list{}<<...<<type_c<state_queue_tracker<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>>);
+      auto list = (type_list{}<<...<<mk_tracker_base_class<factory>(mt));
       return filter(list, [](auto t){return decltype(+t)::is_valid();});
     });
     constexpr auto tracker = unpack(base_class_list, [&](auto... t) {

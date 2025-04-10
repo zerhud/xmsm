@@ -42,6 +42,7 @@ static_assert( !contains(xmsm::type_list<int,double>{}, xmsm::type_c<char>) );
 static_assert( xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<int> << xmsm::type_list<double,int,int>{} == xmsm::type_list<int,double>{} );
 static_assert( xmsm::type_list{} << xmsm::type_c<base> << xmsm::type_c<child> == xmsm::type_list<base>{} );
 static_assert( xmsm::type_list{} << xmsm::type_c<child> << xmsm::type_c<base> == xmsm::type_list<child,base>{} );
+static_assert( revert(xmsm::type_list<char,double,long,int,bool>{}) == xmsm::type_list<bool,int,long,double,char>{} );
 
 static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<char>) == -1 );
 static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<double>) == 1 );
