@@ -101,6 +101,12 @@ struct multi_scenario : basic_scenario<factory, object> {
     clean_scenarios();
     return ret;
   }
+  template<typename... targets> constexpr bool move_to_or_wait(const auto& e, auto&&... scenarios) {
+    bool ret = true;
+    foreach_scenario([&](auto& s){ret &= s.template move_to_or_wait<targets...>(e, scenarios...);});
+    clean_scenarios();
+    return ret;
+  }
   constexpr auto cur_state_hash() const {
     using hash_type = decltype(std::declval<single_scenario_type>().cur_state_hash());
     hash_type ret{};

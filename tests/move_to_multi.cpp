@@ -16,7 +16,7 @@ struct factory : tests::factory {};
 struct ts_multi {
   static auto describe_sm(const auto& f) {
     return mk_multi_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<10>, event<11>>(f)
       , mk_qtrans<state<10>, state<11>, event<11>>(f)
       , mk_qtrans<state<11>, state<12>, event<11>>(f)
@@ -29,7 +29,7 @@ struct ts_multi {
       , mk_trans<state<2>, state<101>, event<10>>(f)
       , mk_trans<state<13>, state<101>, event<10>>(f)
       , finish_state<state<7>>(f), finish_state<state<101>>(f), start_event<event<100>>(f)
-      , mk_qtrans<state<0>, state<5>, event<5>>(f)
+      , mk_qtrans<state<0>, state<5>, event<5>>(f, allow_move(f))
       , mk_qtrans<state<5>, state<6>, event<5>>(f)
       , mk_qtrans<state<6>, state<7>, event<5>>(f)
     );
@@ -75,9 +75,9 @@ static_assert( [] {
   s_m.on(event<100>{}, s);
   s.on(event<0>{}, s_m);
   s_m.on(event<11>{}); s.on_other_scenarios_changed(event<11>{}, s_m);
-  auto ret = s.in_state<state<1>>() + 2*s_m.find_scenario(2)->in_state<state<10>>() + 4*s_m.find_scenario(1)->in_state<state<12>>();
+  auto ret = s.in_state<state<1>>() + 2*s_m.find_scenario(2)->in_state<state<10>>() + 4*s_m.find_scenario(1)->in_state<state<11>>();
   s_m.on(event<11>{}); s.on_other_scenarios_changed(event<11>{}, s_m);
-  ret += 8*s.in_state<state<1>>() + 16*s_m.find_scenario(2)->in_state<state<11>>() + 32*s_m.find_scenario(1)->in_state<state<13>>();
+  ret += 8*s.in_state<state<1>>() + 16*s_m.find_scenario(2)->in_state<state<11>>() + 32*s_m.find_scenario(1)->in_state<state<12>>();
   s_m.on(event<2>{}); s.on_other_scenarios_changed(event<2>{}, s_m);
   if (!s.in_state<state<100>>()) throw __LINE__;
   return ret;
@@ -121,6 +121,7 @@ static_assert( [] {
 static_assert( [] {
   auto [s_m,s] = mk_s_multi();
   s_m.on(event<100>{});
+  s_m.on(event<5>{}); s.on_other_scenarios_changed(event<5>{}, s_m);
   s_m.on(event<5>{}); s.on_other_scenarios_changed(event<5>{}, s_m);
   s_m.on(event<100>{});
   s.on(event<1>{}, s_m);

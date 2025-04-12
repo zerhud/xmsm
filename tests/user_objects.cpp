@@ -24,7 +24,7 @@ struct ts_with_queue {
   int base_val{};
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
       , mk_qtrans<state<3>, state<2>, event<2>>(f)
       , mk_qtrans<state<4>, state<3>, event<3>>(f)

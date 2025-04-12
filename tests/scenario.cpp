@@ -257,7 +257,7 @@ static_assert( [] {
 struct ts_with_queue {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
       , mk_qtrans<state<3>, state<2>, event<2>>(f)
       , mk_qtrans<state<4>, state<3>, event<3>>(f)
@@ -271,11 +271,11 @@ struct ts_with_move_to {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
       , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<100>, state<101>>(f))
-      , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
+      , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f), allow_move(f))
     );
   }
 };
-struct ts_with_try_move_to {
+struct ts_with_move_to_deep {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
       , mk_trans<state<0>, state<2>, event<0>>(f, move_to<ts_with_move_to, state<2>, state<100>>(f))
@@ -296,7 +296,7 @@ static_assert( [] {
 static_assert( [] {
   auto [s_q, s] = mk_s_queue();
   s_q.on(event<0>{}); s.on(event<1>{}, s_q);
-  return s.in_state<state<2>>() + 2*s_q.in_state<state<2>>();
+  return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>();
 }() == 3, "can handle single transition" );
 static_assert( [] {
   auto [s_q, s] = mk_s_queue();
@@ -305,7 +305,7 @@ static_assert( [] {
 }() == 3, "can handle few transitions" );
 static_assert( [] {
   auto [s_q, s] = mk_s_queue();
-  xmsm::scenario<factory, ts_with_try_move_to> s_t{factory{}};
+  xmsm::scenario<factory, ts_with_move_to_deep> s_t{factory{}};
   s_t.on(event<0>{}, s, s_q);
   return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>() + 4*s_t.in_state<state<2>>();
 }() == 7, "can handle chain of transitions" );

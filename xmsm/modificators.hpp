@@ -15,6 +15,7 @@ namespace xmsm::modificators {
 template<typename type> concept check_expression = requires{type::is_checker;};
 
 struct allow_queue {};
+struct allow_move {};
 template<typename e, typename... tail> struct stack_by_event {
   constexpr static bool is_stack_by_event = true;
   constexpr static auto back_events = (type_list<e>{} << ... << type_c<tail>) ;

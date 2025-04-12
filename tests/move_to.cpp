@@ -15,12 +15,12 @@ struct factory : tests::factory {};
 struct ts_with_queue {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
       , mk_qtrans<state<3>, state<2>, event<2>>(f)
       , mk_qtrans<state<4>, state<3>, event<3>>(f)
       , mk_qtrans<state<5>, state<3>, event<4>>(f)
-      , mk_qtrans<state<6>, state<5>, event<5>>(f)
+      , mk_qtrans<state<6>, state<5>, event<5>>(f, allow_move(f))
       , mk_trans<state<0>, state<100>, event<100>>(f)
       , mk_trans<state<1>, state<100>, event<101>>(f)
       , mk_trans<state<5>, state<100>, event<100>>(f)
@@ -34,8 +34,8 @@ struct ts_with_queue {
 struct ts_with_move_to {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<100>, state<101>>(f))
-      , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
+      , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<100>, state<101>>(f), allow_move(f))
+      , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<2>, state<100>>(f), allow_move(f))
       , mk_trans<state<2>, state<0>, event<0>>(f)
       , mk_trans<state<100>, state<0>, event<0>>(f)
     );
@@ -128,9 +128,9 @@ static_assert( [] {
 struct ts_with_queue2 {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
-      , mk_qtrans<state<3>, state<2>, event<2>>(f, only_if(f, in<ts_with_queue2, state<0>>(f)))
+      , mk_qtrans<state<3>, state<2>, event<2>>(f, only_if(f, in<ts_with_queue2, state<0>>(f)), allow_move(f))
       , mk_trans<state<0>, state<3>, event<3>>(f)
       , mk_qtrans<state<1>, state<100>, event<101>>(f)
     );
@@ -153,8 +153,12 @@ static_assert([] {
   xmsm::scenario<factory, ts_combo> s{factory{}};
   s_q.on(event<0>{});
   s.on_other_scenarios_changed(event<0>{}, s_q, s_m, s_t);
-  return s.in_state<state<1>>() + 2*s_q.in_state<state<2>>();
-}() == 3, "when -> move_to");
+  if (!s.move_to_tracker.search<ts_with_queue, state<2>, state<100>>()->is_active()) throw __LINE__;
+  auto ret = s.in_state<state<1>>() + 2*s_q.in_state<state<1>>();
+  s_q.on(event<1>{});
+  s.on_other_scenarios_changed(event<1>{}, s_q, s_m, s_t);
+  return ret + 4*s_q.in_state<state<2>>() + 8*s.in_state<state<1>>();
+}() == 15, "when -> move_to");
 static_assert( [] {
   auto [s_q, s_m, s_t] = mk_s_queue();
   xmsm::scenario<factory, ts_combo> s{factory{}};
@@ -202,7 +206,7 @@ static_assert( [] {
   s_q2.on(event<3>{}, s);
   s.on(event<3>{}, s_q2);
   return s.in_state<state<102>>();
-}() == true );
+}() == true, "try move if allowed and fail if cannot" );
 
 int main(int,char**){
 }

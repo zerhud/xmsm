@@ -124,6 +124,14 @@ struct single_scenario : basic_scenario<factory, object> {
       return match && exec_trans<decltype(+t)>(e, scenarios...)==trans_check_result::done;
     });
   }
+  template<typename... target> constexpr bool move_to_or_wait(const auto& e, auto&&... scenarios) {
+    auto cur_hash = cur_state_hash();
+    return foreach(all_trans_info(), [&](auto t) {
+      bool match = cur_hash==hash<factory>(decltype(+t)::from) && ((type_c<target> == decltype(+t)::to) || ...) && decltype(+t)::is_queue_allowed;
+      if constexpr (decltype(+t)::is_move_allowed) return match && exec_trans<decltype(+t)>(e, scenarios...)==trans_check_result::done;
+      else return match;
+    });
+  }
 private:
   template<typename trans_info> constexpr bool handle_try_move_to(const auto& e, auto&&... scenarios) {
     foreach(trans_info::mod_try_move_to, [&](auto mt) {
@@ -143,7 +151,7 @@ private:
       const bool found = (false || ... || [&](auto& s) {
         bool f = s.own_hash() == hash<factory>(mod.scenario);
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
-        if (f) fail = size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to<decltype(+tgts)...>(e, scenarios...);});
+        if (f) fail = size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);});
         return f;
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);

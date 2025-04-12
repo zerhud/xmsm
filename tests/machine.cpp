@@ -19,7 +19,7 @@ struct ts_with_queue {
   int base_val{};
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f)
+      , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
       , mk_qtrans<state<3>, state<2>, event<2>>(f)
       , mk_qtrans<state<4>, state<3>, event<3>>(f)
@@ -50,6 +50,7 @@ struct ts_multi {
     return mk_multi_sm_description(f
       , mk_trans<state<0>, state<1>>(f, when(f, now_in<ts_with_queue, state<2>>(f)))
       , mk_qtrans<state<1>, state<2>>(f)
+      , mk_qtrans<state<2>, state<3>>(f)
       , mk_trans<state<2>, state<1000>, event<10>>(f)
       , finish_state<state<1000>>(f), start_event<event<102>>(f)
     );
@@ -72,6 +73,7 @@ static_assert( [] {
   machine m{factory{}};
   m.on(event<102>{});
   m.on(event0{});
+  m.on(event1{});
   return get<0>(m.scenarios).in_state<state<2>>() + 2*get<1>(m.scenarios).in_state<state<1>>() + 4*get<2>(m.scenarios).in_state<state<1>>() + 8*(get<3>(m.scenarios).cur_state_hash() == hash<factory>(xmsm::type_c<state<1>>));
 }() == 15, "method on transfer event to all scenarios and work with changes" );
 

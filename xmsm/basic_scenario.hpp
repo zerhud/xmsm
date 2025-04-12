@@ -27,6 +27,7 @@ struct trans_info {
 
   constexpr static bool is_trans_info = true;
   constexpr static bool is_queue_allowed = []{return size(filter(type_list<_mods...>{}, [](auto v){return v == type_c<modificators::allow_queue>;})) > 0;}();
+  constexpr static bool is_move_allowed = []{return size(filter(type_list<_mods...>{}, [](auto v){return v == type_c<modificators::allow_move>;})) > 0;}();
   constexpr static auto to = type_c<_to>;
   constexpr static auto from = type_c<_from>;
   constexpr static auto event = type_c<_event>;
@@ -81,6 +82,7 @@ template<typename factory, typename object> struct basic_scenario {
   template<typename st> friend constexpr auto finish_state(const basic_scenario&){ return modificators::finish_state<st>{}; }
   template<typename event> friend constexpr auto start_event(const basic_scenario&){ return modificators::start_event<event>{}; }
   friend constexpr auto allow_queue(const basic_scenario&) { return modificators::allow_queue{}; }
+  friend constexpr auto allow_move(const basic_scenario&) { return modificators::allow_move{}; }
   template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
   template<typename sc, typename st> friend constexpr auto try_move_to(const basic_scenario&) { return modificators::try_move_to<sc, st>{}; }
   template<typename type> friend constexpr auto mk_change(const basic_scenario&) { return type_c<type>; }
