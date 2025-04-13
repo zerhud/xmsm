@@ -61,7 +61,7 @@ struct multi_scenario : basic_scenario<factory, object> {
   decltype(mk_scenarios_type(std::declval<factory>())) scenarios;
 
   constexpr auto count() const { return scenarios.size(); }
-  template<typename st> constexpr auto count_in() const { auto ret = 0; foreach_scenario([&](const auto& s){ret+=in_state<st>(s);}); return ret; }
+  template<typename... st> constexpr auto count_in() const { auto ret = 0; foreach_scenario([&](const auto& s){ret+=(0+...+in_state<st>(s));}); return ret; }
   constexpr bool empty() const { return scenarios.empty(); }
   template<typename id_type> constexpr user_type* find(const id_type& id) {
     auto* s = find_scenario(id);
@@ -77,7 +77,7 @@ struct multi_scenario : basic_scenario<factory, object> {
     }
     return scenario_state::ready;
   }
-  constexpr void reset_own_state() { foreach_scenario([](auto& s){s.reset_own_state();}); }
+  constexpr void reset_own_state() noexcept { foreach_scenario([](auto& s){s.reset_own_state();}); }
 
   constexpr void on_address(const auto& e, const auto& id, auto&&... scenarios) {
     if (auto* s=find_scenario(id);s) s->on(e, scenarios...);

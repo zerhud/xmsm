@@ -71,7 +71,7 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr explicit single_scenario(factory f, user_type uo) : base(std::move(f)), obj(std::move(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
 
   constexpr scenario_state own_state() const { return this->_own_state; }
-  constexpr void reset_own_state() { _own_state=scenario_state::ready; }
+  constexpr void reset_own_state() noexcept { _own_state=scenario_state::ready; }
   constexpr auto cur_state_hash() const {
     return unpack(all_states(), [&](auto... st) {
       constexpr static decltype(hash<factory>(first(all_states()))) hashes[] = {hash<factory>(st)...};

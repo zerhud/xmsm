@@ -74,6 +74,9 @@ template<typename factory, typename object> struct basic_scenario {
   friend constexpr auto _false(const basic_scenario&){ return scenario_checker::_false{}; }
   template<typename s, typename... st> friend constexpr auto in(const basic_scenario&){ return scenario_checker::in<s, st...>{}; }
   template<typename s, typename... st> friend constexpr auto now_in(const basic_scenario&){ return scenario_checker::now_in<s, st...>{}; }
+  template<typename s, typename... st> friend constexpr auto all_in(const basic_scenario&){ return scenario_checker::all_in<s, st...>{}; }
+  template<typename s, auto cnt, typename... st> friend constexpr auto cnt_in(const basic_scenario&){ return scenario_checker::count_in<s, cnt, st...>{}; }
+  template<typename s> friend constexpr auto affected(const basic_scenario&){ return scenario_checker::affected<s>{}; }
   template<typename e> friend constexpr auto stack_by_expr(const basic_scenario&, e) { return modificators::stack_by_expression<e>{}; }
   template<typename e> friend constexpr auto when(const basic_scenario&, e) { return modificators::when<e>{}; }
   template<typename e> friend constexpr auto only_if(const basic_scenario&, e) { return modificators::only_if<e>{}; }

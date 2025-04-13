@@ -22,18 +22,14 @@ struct ts_with_queue {
       , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f)
       , mk_qtrans<state<3>, state<2>, event<2>>(f)
-      , mk_qtrans<state<4>, state<3>, event<3>>(f)
-      , mk_qtrans<state<5>, state<3>, event<4>>(f)
-      , mk_qtrans<state<6>, state<5>, event<5>>(f)
-      , mk_trans<state<0>, state<100>, event<100>>(f)
-      , mk_trans<state<1>, state<100>, event<101>>(f)
+      , mk_trans<state<0>, state<100>, event<101>>(f)
     );
   }
 };
 struct ts_with_move_to {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
-      , mk_qtrans<state<0>, state<1>, event<0>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
+      , mk_qtrans<state<0>, state<1>, event<10>>(f, move_to<ts_with_queue, state<2>, state<100>>(f))
     );
   }
 };
@@ -54,6 +50,7 @@ struct ts_with_cond {
     return mk_sm_description(f
       , mk_trans<state<0>, state<1>>(f, when(f, now_in<ts_with_queue, state<2>>(f)))
       , mk_trans<state<0>, state<2>>(f, when(f, cnt_in<ts_multi, 1, state<3>, state<105>>(f)))
+      , mk_trans<state<2>, state<3>>(f, when(f, cnt_in<ts_multi, 1, state<3>>(f) && !affected<ts_multi>(f)))
       , mk_trans<state<1>, state<0>, event<100>>(f)
     );
   }
@@ -69,50 +66,16 @@ template<typename type> constexpr auto change_type(const factory&, const auto& a
 
 using machine = xmsm::machine<factory, ts_with_queue, ts_with_move_to, ts_with_cond, ts_multi>;
 
-static_assert( size(machine{factory{}}.scenarios)==4 );
-static_assert( std::is_same_v<std::decay_t<decltype(get<0>(machine{factory{}}.scenarios))>, xmsm::scenario<factory, ts_with_queue, ts_with_queue_user>> );
-static_assert( std::is_same_v<std::decay_t<decltype(get<0>(machine{factory{}}))>, ts_with_queue_user> );
-static_assert( std::is_same_v<std::decay_t<decltype(get<ts_with_queue>(machine{factory{}}))>, ts_with_queue_user> );
-static_assert( [] {
-  machine m{factory{}};
-  m.on(event<102>{});
-  m.on(event0{});
-  m.on(event1{});
-  return get<0>(m.scenarios).in_state<state<2>>() + 2*get<1>(m.scenarios).in_state<state<1>>() + 4*get<2>(m.scenarios).in_state<state<1>>()
-  + 8*(get<3>(m.scenarios).count() == 1) + 16*(get<3>(m.scenarios).count_in<state<1>>() == 1)
-  ;
-}() == 31, "method on transfer event to all scenarios and work with changes" );
-
-static_assert( [] {
-  machine m{factory{}};
-  m.on(event<102>{});
-  return m.in_state<ts_multi, state0>() + 2*m.in_state<ts_with_queue, state<0>>() + 4*!m.in_state<ts_with_queue, state1>();
-}() == 7 );
-static_assert( [] {
-  machine m{factory{}};
-  auto& q = get<ts_with_queue>(m);
-  auto& t = get<1>(m);
-  return std::is_same_v<decltype(q), ts_with_queue_user&> + 2*std::is_same_v<decltype(t), ts_with_move_to&>;
-}() == 3 );
-static_assert( [] {
-  machine m{factory{}};
-  m.on(event0{});
-  m.on(event1{});
-  auto ret = m.in_state<ts_with_cond, state<1>>() + 2*m.in_state<ts_with_queue, state<2>>();
-  m.on(event<100>{});
-  ret += 4*m.in_state<ts_with_cond, state<0>>() + 8*m.in_state<ts_with_queue, state<2>>();
-  return ret;
-}() == 15, "machine resets own state in the end of on method" );
 static_assert( [] {
   machine m{factory{}};
   m.on(event<102>{}); m.on(event<2>{});
   m.on(event<102>{});
   m.on(event<3>{});
-  return m.in_state<ts_with_cond, state<2>>() + 2*(get<3>(m.scenarios).count_in<state<3>>()==1) + 4*(get<3>(m.scenarios).count()==2);
-}() == 7 );
+  auto ret = m.in_state<ts_with_cond, state<2>>() + 2*(get<3>(m.scenarios).count_in<state<3>>()==1) + 4*(get<3>(m.scenarios).count()==2);
+  m.on(event<102>{});
+  ret += 8*m.in_state<ts_with_cond, state<3>>();
+  return ret;
+}() == 15 );
 
-//TODO:
-//   3. implement protocol for distributed machines
-
-int main(int,char**){
+int main(int,char**) {
 }

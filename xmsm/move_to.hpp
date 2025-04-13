@@ -94,14 +94,14 @@ struct state_queue_tracker {
 
 template<typename factory, typename list, typename scenario, typename target_state, typename fail_state>
 struct state_queue_tracker_multi {
-  int indexes[3] = {0,-1,0}; // sum, max_steps, n
+  int sum{0}, max_steps{-1}, n{0};
 
   consteval static bool is_valid() {return size(list{})>0;}
 
   template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker_multi* search()
   requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
-  constexpr bool deactivate() {return indexes[0]=0, indexes[1]=-1, indexes[2]=0; }
-  constexpr bool is_active() const {return indexes[1]>0;}
+  constexpr bool deactivate() {return sum=0, max_steps=-1, n=0; }
+  constexpr bool is_active() const {return max_steps>0;}
   constexpr auto count_to_end(auto h, auto _st_list) {
     auto st_list = revert(_st_list);
     return [&]<auto... inds>(std::index_sequence<inds...>){
@@ -121,12 +121,12 @@ struct state_queue_tracker_multi {
   }
   constexpr void activate(const auto& ms) {
     if (is_active()) return;
-    indexes[2] = ms.count();
-    if (indexes[2]==0) return ;
+    n = ms.count();
+    if (n==0) return ;
     ms.foreach_scenario([this](const auto&s) {
       auto cur_max = scenario_maximum(s);
-      indexes[1] = cur_max*(indexes[1]<cur_max);
-      indexes[0] += cur_max;
+      max_steps = cur_max*(max_steps<cur_max);
+      sum += cur_max;
     });
   }
   template<typename other_scenario, typename user_type> constexpr bool update(const xmsm::scenario<factory, other_scenario, user_type>& s) {
@@ -138,16 +138,16 @@ struct state_queue_tracker_multi {
       auto cur_max = scenario_maximum(s);
       max = max*(max>cur_max) + cur_max*(max<=cur_max);
       sum += cur_max;
-      indexes[0] *= cur_max>0;
+      sum *= cur_max>0;
     });
-    indexes[0] = indexes[0]*(indexes[0]<=sum) + sum*(sum<indexes[0]);
-    indexes[1] = indexes[1]*(indexes[1]<=max) + max*(max<indexes[1]);
-    return !(indexes[0]>0 && sum <= indexes[0] && max <= indexes[1]);
+    this->sum = this->sum*(this->sum<=sum) + sum*(sum<this->sum);
+    max_steps = max_steps*(max_steps<=max) + max*(max<max_steps);
+    return !(this->sum>0 && sum <= this->sum && max <= max_steps);
   }
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
     if (!is_active()) return;
     if constexpr (!basic_scenario<factory,scenario>::is_finish_state(type_c<target_state>)) {
-      if (utils::count_from_set<factory,scenario>(others...) < indexes[2]) {
+      if (utils::count_from_set<factory,scenario>(others...) < n) {
         fail(cur_scenario, e, others...);
         return;
       }

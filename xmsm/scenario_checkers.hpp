@@ -23,9 +23,11 @@ template<typename sc, typename... st> struct in {
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
     auto cur = s.cur_state_hash();
-    return scenario == type_dc<obj> && unpack(states, [&](auto... i){ return (false || ... || (hash<factory>(i)==cur)); });
+    if constexpr(scenario != type_dc<obj>) return false;
+    else return unpack(states, [&](auto... i){ return (false || ... || (hash<factory>(i)==cur)); });
   }
 };
+template<typename sc, typename... st> using all_in = in<sc, st...>;
 
 template<typename sc, typename... st> struct now_in {
   constexpr static bool is_checker = true;
@@ -35,6 +37,27 @@ template<typename sc, typename... st> struct now_in {
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
     return s.own_state() == scenario_state::fired && in<sc,st...>::check(s);
+  }
+};
+template<typename sc, auto cnt, typename... st> struct count_in {
+  constexpr static bool is_checker = true;
+  constexpr static auto scenario = type_c<sc>;
+  constexpr static auto states = (type_list{} << ... << type_c<st>);
+
+  constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
+  template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
+    if constexpr(type_dc<obj> != type_c<sc>) return false;
+    else if constexpr(!s.is_multi()) return in<sc, st...>::check(s);
+    else return cnt <= s.template count_in<st...>();
+  }
+};
+template<typename sc> struct affected {
+  constexpr static bool is_checker = true;
+  constexpr static auto scenario = type_c<sc>;
+  constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
+  template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
+    if constexpr(type_dc<obj> != type_c<sc>) return false;
+    else return s.own_state() == scenario_state::fired;
   }
 };
 

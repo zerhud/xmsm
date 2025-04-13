@@ -31,13 +31,24 @@ struct machine {
   decltype(mk_scenarios(std::declval<factory>())) scenarios;
 
   constexpr auto on(auto&& event) {
+    foreach(scenarios, [](auto&s){s.reset_own_state();return false;});
     foreach(scenarios, [&](auto& s) {
       unpack(scenarios, [&](auto&&...others) {
         s.on(event, others...);
-        s.on_other_scenarios_changed(event, others...);
+        (void)(others.on_other_scenarios_changed(event, others...),...);
       });
       return false;
     });
+  }
+  template<typename scenario, typename state> constexpr bool in_state() {
+    return unpack(scenarios, [](auto&&... s){return (0+...+s.template in_state_by_scenario<scenario,state>());});
+  }
+  template<typename scenario> constexpr friend auto& get(auto&& m) {
+    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<scenario>, s...);});
+    return get<ind>(m.scenarios).obj;
+  }
+  template<auto ind> constexpr friend auto& get(auto&& m) {
+    return get<ind>(m.scenarios).obj;
   }
 };
 
