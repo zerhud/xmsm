@@ -119,7 +119,7 @@ static_assert( [] {
 }() == 3, "deactivate queue after fail" );
 static_assert( [] {
   auto [s_q, s, s_t] = mk_s_queue();
-  s.on(event<1>{}, s_q, s_t);
+  s.on(event<1>{}, s_q, s_t); s.on_other_scenarios_changed(event<1>{}, s_q, s_t);
   s_q.on(event<0>{}, s, s_t); s.on_other_scenarios_changed(event<0>{}, s_q, s_t);
   return s.in_state<state<100>>();
 }() == true, "cannot backward state" );
@@ -207,6 +207,13 @@ static_assert( [] {
   s.on(event<3>{}, s_q2);
   return s.in_state<state<102>>();
 }() == true, "try move if allowed and fail if cannot" );
+static_assert( [] {
+  xmsm::scenario<factory, ts_with_queue2> s_q2{factory{}};
+  xmsm::scenario<factory, ts_combo> s(factory{});
+  s_q2.on(event<3>{});
+  s.on(event<3>{}, s_q2);
+  return !s.move_to_tracker.is_active() + 2*s.in_state<state<102>>();
+}() == 3, "tracker is deactivated on fail" );
 
 int main(int,char**){
 }

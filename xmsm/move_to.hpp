@@ -85,7 +85,8 @@ struct state_queue_tracker {
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
     static_assert( !basic_scenario<factory, scenario>::is_multi() );
     auto scenario_cur_hash  = utils::cur_state_hash_from_set<factory, scenario>(others...);
-    if (!check_and_shift_state(scenario_cur_hash)) {
+    if (in_state<fail_state>(*cur_scenario)) deactivate();
+    else if (utils::is_broken_from_set<scenario>(others...) || !check_and_shift_state(scenario_cur_hash)) {
       cur_scenario->template force_move_to<fail_state>(e, others...);
       deactivate();
     }

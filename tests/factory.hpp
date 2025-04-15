@@ -10,6 +10,8 @@
 
 #include "xmsm.hpp"
 
+#include <list>
+#include <atomic>
 #include <vector>
 #include <variant>
 #include <string_view>
@@ -37,5 +39,9 @@ constexpr void erase(const factory&, auto& cnt, auto ind) {
 
 template<auto v> struct state { constexpr static auto val = v; int rt_val{0}; };
 template<auto v> struct event { constexpr static auto val = v; int rt_val{0}; };
+
+struct rt_factory : factory {};
+template<typename type> constexpr auto mk_list(const rt_factory&) { return std::list<type>{}; }
+template<typename type> constexpr auto mk_atomic(const rt_factory&) { return std::atomic<type>{}; }
 
 }

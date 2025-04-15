@@ -118,4 +118,11 @@ constexpr void xmsm_erase_if(const auto& f, auto& con, auto&& fnc) {
   }
 }
 
+template<typename scenario, typename transaction, typename next> constexpr void call_with_try_catch(const auto& f, auto&& fnc) {
+  if constexpr(!requires{on_exception<scenario, transaction, next>(f);}) fnc();
+  else {
+    try{fnc();} catch (...){on_exception<scenario, transaction, next>(f);}
+  }
+}
+
 }

@@ -29,6 +29,12 @@ template<typename factory, typename type> constexpr auto count_from_set(auto&...
   (void)(pointer_selector<type, decltype(fnc)>{fnc} ^...^ scenarios);
   return ret;
 }
+template<typename type> constexpr bool is_broken_from_set(auto&... scenarios) {
+  bool ret = false;
+  auto fnc = [&](auto& s){ret=s.own_state()==scenario_state::broken;};
+  (void)(pointer_selector<type, decltype(fnc)>{fnc} ^...^ scenarios);
+  return ret;
+}
 template<typename scenario> consteval auto index_of_scenario(_type_c<scenario>, auto&&... list) {
   auto check = []<typename factory, typename cur_scenario>(const basic_scenario<factory, cur_scenario>&){return type_c<scenario> == type_c<cur_scenario>;};
   auto ind=0;

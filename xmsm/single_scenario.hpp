@@ -148,6 +148,7 @@ private:
     return !foreach(trans_info::mod_move_to, [&](auto mt) {
       constexpr auto mod = mt();
       bool fail = false;
+      move_to_tracker.activate(mt, scenarios...);
       const bool found = (false || ... || [&](auto& s) {
         bool f = s.own_hash() == hash<factory>(mod.scenario);
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
@@ -155,17 +156,21 @@ private:
         return f;
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);
-      if (fail || !found) force_move_to<decltype(+mod.fail_state)>(e, scenarios...);
-      else move_to_tracker.activate(mt, scenarios...);
+      if (fail || !found) {
+        force_move_to<decltype(+mod.fail_state)>(e, scenarios...);
+        move_to_tracker.update(this, e, scenarios...);
+      }
       return !(!fail && found);
     });
   }
   template<typename _next_type, typename trans_info=trans_info<void,void,void>> constexpr void change_state(const auto& e) {
     _own_state = scenario_state::broken;
     using next_type = decltype(+this->ch_type(type_c<_next_type>));
-    auto next = create_state<next_type>(this->f, e);
-    visit([&](auto& s) { call_on_exit(this->f, obj, s, e); }, cur_state());
-    call_on_enter(this->f, obj, make_next_state<next_type>(trans_info{}, next), e);
+    call_with_try_catch<object, trans_info, _next_type>(this->f, [&] {
+      auto next = create_state<next_type>(this->f, e);
+      visit([&](auto& s) { call_on_exit(this->f, obj, s, e); }, cur_state());
+      call_on_enter(this->f, obj, make_next_state<next_type>(trans_info{}, next), e);
+    });
     _own_state = scenario_state::fired;
   }
   template<typename info> constexpr trans_check_result exec_trans(const auto& e, auto&&... scenarios) {

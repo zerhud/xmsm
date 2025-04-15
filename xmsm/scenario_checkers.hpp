@@ -51,13 +51,13 @@ template<typename sc, auto cnt, typename... st> struct count_in {
     else return cnt <= s.template count_in<st...>();
   }
 };
-template<typename sc> struct affected {
+template<typename sc, auto req_st> struct in_own_state {
   constexpr static bool is_checker = true;
   constexpr static auto scenario = type_c<sc>;
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
     if constexpr(type_dc<obj> != type_c<sc>) return false;
-    else return s.own_state() == scenario_state::fired;
+    else return s.own_state() == req_st;
   }
 };
 
