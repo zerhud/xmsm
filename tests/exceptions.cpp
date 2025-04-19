@@ -30,6 +30,10 @@ struct state5_with_ex : state<5> {
 template<typename type> constexpr auto change_type(const factory&, const auto& adl) {
   if constexpr(std::is_same_v<type,state<5>>) return mk_change<state5_with_ex>(adl);
 }
+struct ex_factory : factory { int* ex_count=nullptr; };
+template<typename scenario, typename trans, typename next> constexpr void on_exception(const ex_factory& f) {
+  ++(*f.ex_count);
+}
 struct ts_simple {
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
@@ -102,5 +106,12 @@ int main(int,char**) {
     m.try_to_repair(event<1>{});
     if (get<1>(m.scenarios).move_to_tracker.is_active()) error("the move_to_tracker is active");
     if (!m.in_state<ts_move, state<100>>()) error("cannot move and the scenario in \"wrong\" state");
+  }
+  {
+    int ex_cnt=0;
+    xmsm::machine<ex_factory, ts_queue> m{ex_factory{{}, &ex_cnt}};
+    m.on(event<5>{});
+    if (!m.in_state<ts_queue, state<0>>()) error("my test doesn't work");
+    if (ex_cnt!=1) error("the on_exception wasn't called");
   }
 }

@@ -208,8 +208,7 @@ template<typename factory,typename base> struct final_tracker : base {
   constexpr void activate(auto mt, auto&&... scenarios) { if constexpr(requires{this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();}) {
     auto* self = this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();
     if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi()) self->activate(utils::search_scenario(mt().scenario, scenarios...));
-    else self->activate(utils::cur_state_hash_from_set<factory, decltype(+mt().scenario)>(scenarios...)
-    );
+    else self->activate( utils::cur_state_hash_from_set<factory, decltype(+mt().scenario)>(scenarios...) );
   }}
 };
 

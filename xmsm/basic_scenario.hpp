@@ -13,6 +13,7 @@
 #include "modificators.hpp"
 #include "scenario_checkers.hpp"
 #include "declarations.hpp"
+#include "utils.hpp"
 
 namespace xmsm {
 
@@ -98,6 +99,17 @@ template<typename factory, typename object> struct basic_scenario {
     if constexpr (requires{i().is_finish_state;}) return i().st==decltype(st){};
     else return 0;
   }(i));});}
+  constexpr static auto entity() {
+    if constexpr (requires{typename object::entity;}) return type_c<typename object::entity>;
+    else if constexpr (requires{ typename factory::default_entity; }) return type_c<typename factory::default_entity>;
+    else {
+      static_assert( !requires{ typename factory::entity; }, "if factory defines entity there is should not to be scenario without entity (or the factory should to provide default_entity)" );
+      return type_c<>;
+    }
+  }
+  constexpr static bool is_remote() {
+    return entity() != utils::factory_entity<factory>();
+  }
 
   constexpr auto ch_type(auto from) const {
     if constexpr(!requires{ change_type<int>(f, *this); }) return from;
@@ -143,6 +155,31 @@ template<typename factory, typename object> struct basic_scenario {
       };
       return (type_list() << ... << mk_ti(fs));
     });
+  }
+  constexpr static auto all_states() {
+    auto def = filter(info{}, [](auto info){if constexpr(requires{decltype(+info)::is_def_state;}) return decltype(+info)::st; else return type_c<>;});
+    static_assert( size(def) < 2, "few default states was picked to scenario" );
+    auto list = unpack(all_trans_info(), [&](auto... states) {
+      constexpr auto find_fail_state = [](auto ti){return unpack(decltype(+ti)::mod_move_to, [](auto... mt){return (type_list{}<<...<<mt().fail_state);});};
+      return ((((type_list{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to) << ... << find_fail_state(states));
+    });
+    static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );
+    static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in states found" );
+    return list;
+  }
+  constexpr static auto all_events() {
+    constexpr auto list = unpack(all_trans_info(), [](auto... states) {
+      return (type_list{} << ... << [](auto st) {
+        if constexpr (st.mod_stack_by_event==type_c<>) return st.event;
+        else return type_list{} << st.event << decltype(+st.mod_stack_by_event)::back_events;
+      }(decltype(+states){}));
+    });
+    static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some events (hash==0)" );
+    if constexpr (constexpr auto dup_cnt = unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);}); dup_cnt!=0) {
+      list.__has_duplicates();
+      static_assert(dup_cnt ==0, "hash collision in events found" );
+    }
+    return list;
   }
 };
 

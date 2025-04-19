@@ -10,11 +10,14 @@
 
 #include "single_scenario.hpp"
 #include "multi_scenario.hpp"
+#include "remote_scenario.hpp"
 
 namespace xmsm {
 
 template<typename factory, typename object, typename user_type> constexpr auto mk_scenario_base_type() {
-  if constexpr (basic_scenario<factory, object>::is_multi()) return type_c<multi_scenario<factory, object, user_type>>;
+  using basic = basic_scenario<factory, object>;
+  if constexpr(basic::is_remote()) return type_c<remote_scenario<factory, object, user_type>>;
+  else if constexpr (basic::is_multi()) return type_c<multi_scenario<factory, object, user_type>>;
   else return type_c<single_scenario<factory, object, user_type>>;
 }
 

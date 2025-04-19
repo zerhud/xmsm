@@ -12,6 +12,12 @@
 #include "hana.hpp"
 
 namespace xmsm::utils {
+template<typename factory> constexpr auto factory_entity() {
+  if constexpr(requires{ typename factory::entity; }) return type_c<typename factory::entity>;
+  else if constexpr(requires{ typename factory::default_entity; }) return type_c<typename factory::default_entity>;
+  else return type_c<>;
+}
+
 template<typename type, typename fnc_type> struct pointer_selector {
   fnc_type fnc;
   template<typename factory, typename user_type> constexpr pointer_selector& operator^(scenario<factory, type, user_type>& s) { fnc(s); return *this; }
@@ -54,6 +60,18 @@ template<typename scenario> constexpr auto& search_scenario(_type_c<scenario>, a
   return list...[index_of_scenario(type_c<scenario>, list...)];
 #else
   return _search_scenario<index_of_scenario(type_c<scenario>, list...), 0>(list...);
+#endif
+}
+template<auto ind, auto cur> constexpr decltype(auto) _nth(auto&& first, auto&&... tail) {
+  if constexpr(ind==cur) return std::forward<decltype(first)>(first);
+  else return _nth<ind,cur+1>(std::forward<decltype(tail)>(tail)...);
+}
+template<auto ind> constexpr decltype(auto) nth(auto&&... args) {
+  //TODO: GCC15: delete the function
+#if defined(__cpp_pack_indexing)
+  return std::forward<decltype(args...[ind])>(args...[ind]);
+#else
+  return _nth<ind, 0>(std::forward<decltype(args)>(args)...);
 #endif
 }
 

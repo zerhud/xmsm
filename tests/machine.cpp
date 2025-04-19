@@ -111,8 +111,5 @@ static_assert( [] {
   return m.in_state<ts_with_cond, state<2>>() + 2*(get<3>(m.scenarios).count_in<state<3>>()==1) + 4*(get<3>(m.scenarios).count()==2);
 }() == 7 );
 
-//TODO:
-//   3. implement protocol for distributed machines
-
 int main(int,char**){
 }

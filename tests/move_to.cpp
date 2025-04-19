@@ -143,6 +143,7 @@ struct ts_combo {
       , mk_qtrans<state<0>, state<2>, event<1>>(f, move_to<ts_with_queue, state<100>, state<100>>(f))
       , mk_qtrans<state<0>, state<3>, event<2>>(f, move_to<ts_with_queue, state<2>, state<101>>(f), move_to<ts_with_queue2, state<2>, state<102>>(f))
       , mk_qtrans<state<0>, state<4>, event<3>>(f, move_to<ts_with_queue2, state<2>, state<102>>(f))
+      , mk_trans<state<0>, state<5>, event<4>>(f, try_move_to<ts_with_queue2, state<2>>(f))
       , to_state_mods<state<100>>(f, stack_by_event<event<1100>>(f))
       , from_state_mods<state<1>>(f, stack_by_event<event<1101>>(f))
     );
@@ -214,6 +215,14 @@ static_assert( [] {
   s.on(event<3>{}, s_q2);
   return !s.move_to_tracker.is_active() + 2*s.in_state<state<102>>();
 }() == 3, "tracker is deactivated on fail" );
+static_assert( [] {
+  xmsm::scenario<factory, ts_with_queue2> s_q2{factory{}};
+  xmsm::scenario<factory, ts_combo> s(factory{});
+  s_q2.on(event<0>{}, s);
+  if (!s_q2.in_state<state<1>>()) throw __LINE__;
+  s.on(event<4>{}, s_q2);
+  return s.in_state<state<5>>() + 2*s_q2.in_state<state<1>>();
+}() == 3, "try_move_to works only if move allowed" );
 
 int main(int,char**){
 }

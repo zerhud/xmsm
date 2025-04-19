@@ -46,6 +46,7 @@ static_assert( revert(xmsm::type_list<char,double,long,int,bool>{}) == xmsm::typ
 
 static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<char>) == -1 );
 static_assert( index_of(xmsm::type_list<int,double>{}, xmsm::type_c<double>) == 1 );
+static_assert( unpack_with_inds(xmsm::type_list<int,double>{}, []<auto... inds>(auto&&... list){ return sizeof...(inds) == sizeof...(list); }) );
 
 int main(int,char**){
   {

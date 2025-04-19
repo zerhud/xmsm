@@ -101,6 +101,12 @@ struct multi_scenario : basic_scenario<factory, object> {
     clean_scenarios();
     return ret;
   }
+  template<typename... targets> constexpr bool move_to_or_wait_cond(const auto& e, auto&& fnc, auto&&... scenarios) {
+    bool ret = true;
+    foreach_scenario([&](auto& s){ret &= s.template move_to_or_wait_cond<targets...>(e, std::forward<decltype(fnc)>(fnc), scenarios...);});
+    clean_scenarios();
+    return ret;
+  }
   template<typename... targets> constexpr bool move_to_or_wait(const auto& e, auto&&... scenarios) {
     bool ret = true;
     foreach_scenario([&](auto& s){ret &= s.template move_to_or_wait<targets...>(e, scenarios...);});
