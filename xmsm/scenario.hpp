@@ -33,6 +33,7 @@ struct scenario : decltype(+mk_scenario_base_type<factory, object, user_type>())
     }
     else return false;
   }
+  constexpr base& debug_get_base() { return (base&)*this; }
 };
 
 }

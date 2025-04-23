@@ -46,6 +46,15 @@ struct ts_move_multi {
     );
   }
 };
+struct ts_multi2 {
+  static auto describe_sm(const auto& f) {
+    return mk_multi_sm_description(f
+      , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_multi, state<10>, state<100>>(f))
+      , mk_trans<state<1>, state<100>>(f, allow_move(f))
+      , start_event<event<100>>(f), finish_state<state<100>>(f)
+    );
+  }
+};
 constexpr auto mk_s_multi() { struct { xmsm::scenario<factory, ts_multi> m{factory{}}; xmsm::scenario<factory, ts_move_multi> s{factory{}}; } ret; return ret; }
 static_assert( [] {
   auto [s_m,s] = mk_s_multi();
@@ -132,5 +141,22 @@ static_assert( [] {
   return ret + 4*s.in_state<state<2>>() + 8*(s_m.count()==0);
 }() == 15, "one of scenario can finish if target state is a finish state" );
 
+static_assert( [] {
+  xmsm::scenario<factory, ts_multi> s1{factory{}};
+  xmsm::scenario<factory, ts_multi2> s2{factory{}};
+  s1.on(event<100>{}); s2.on(event<100>{});
+  s2.on(event<0>{}, s1);
+  auto ret = s1.count_in<state<1>>()==1;
+  s1.on(event<2>{}, s2);
+  s2.on_other_scenarios_changed(event<2>{}, s1, s2);
+  return ret + 2*(s1.count_in<state<3>>()==1) + 4*(s1.count()==1) + 8*(s2.count()==0);
+}() == 15 );
+static_assert( [] {
+  xmsm::scenario<factory, ts_multi> s1{factory{}};
+  xmsm::scenario<factory, ts_multi2> s2{factory{}};
+  s1.on(event<100>{}, s2); s1.on(event<0>{}, s2); s1.on(event<2>{}, s2);
+  s2.on(event<100>{}, s1); s2.on(event<0>{}, s1);
+  return s2.count();
+}() == 0, "fail if move not allowed, remove scenario if fail state is finish state" );
 int main(int,char**) {
 }

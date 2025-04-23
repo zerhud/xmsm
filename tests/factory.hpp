@@ -25,6 +25,7 @@ struct factory {
 template<typename... types> constexpr auto mk_variant(const factory&) {
   return std::variant<types...>{};
 }
+template<typename type> constexpr auto mk_vec(const factory&) { return std::vector<type>{}; }
 template<typename type> constexpr auto mk_list(const factory&) {
   auto ret = std::vector<type>{};
   ret.reserve(1000); // we can't use std::list in constexpr context, and the vector shouldn't move elements

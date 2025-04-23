@@ -48,9 +48,7 @@ template<typename... left, typename... right> constexpr auto operator<<(const ty
   return (l << ... << type_c<right>);
 }
 template<typename... items> constexpr auto revert(const type_list<items...>&) {return (type_list{} % ... % type_c<items>);}
-template<typename... items> constexpr auto unpack(const type_list<items...>&, auto&& fnc) {
-  return fnc(type_c<items>...);
-}
+template<typename... items> constexpr auto unpack(const type_list<items...>&, auto&& fnc) { return fnc(type_c<items>...); }
 template<typename... items> constexpr auto unpack_with_inds(const type_list<items...>&, auto&& fnc) {
   return [&]<auto...inds>(std::index_sequence<inds...>){
     return fnc.template operator()<inds...>(type_c<items>...);
@@ -98,12 +96,27 @@ consteval auto max_size(auto&&... lists) {
   return max;
 }
 
+template<typename type> constexpr auto _name(_type_c<type>) {
+  auto len = []<auto N>(const char(&str)[N]){return (unsigned)(N-1);};
+  constexpr auto pref_len =
+#ifdef __clang__
+    len("auto xmsm::_name(_type_c<type>) [type = ")
+#else
+    len("constexpr auto xmsm::_name(_type_c<r>) [with type = ")
+#endif
+    ;
+  struct {
+    const char* base;
+    unsigned size;
+  } ret {__PRETTY_FUNCTION__, len(__PRETTY_FUNCTION__)-1};
+  ret.base += pref_len;
+  ret.size -= pref_len;
+  return ret;
+}
 template<typename factory, typename type> constexpr auto name(_type_c<type>) {
   using sv = factory::string_view;
-  auto ret = sv{__PRETTY_FUNCTION__};
-  ret.remove_suffix(1);
-  ret.remove_prefix(ret.find(sv{"type = "}) + 7);
-  return ret;
+  constexpr auto vec = _name(type_c<type>);
+  return sv{vec.base, vec.size};
 }
 
 template<typename factory> constexpr auto hash32(auto type) {
@@ -122,14 +135,25 @@ template<typename type, auto ind> struct tuple_value {
   template<auto i> constexpr const type& g() const requires(i==ind){ return value; }
   template<auto i> constexpr friend type& get(tuple_value& t) requires(i==ind){ return t.value; }
   template<auto i> constexpr friend const type& get(const tuple_value& t) requires(i==ind){ return t.value; }
+  template<typename object, template<typename...>class holder, typename factory, typename... tail, auto _ind>
+  constexpr friend type& get(tuple_value<holder<factory, object, tail...>, _ind>& t) requires (type_c<type> == type_c<holder<factory,object,tail...>>) { return t.value; }
+};
+template<typename... bases> struct tuple_storage : bases... {
+  using bases::g...;
+  constexpr decltype(sizeof...(bases)) size() const { return sizeof...(bases); }
+#ifndef __clang__ //TODO: GCC15: bug in gcc: the tuple_value is ambiguous base class for some reason, and the friend get method is not available for typename template parameter
+  template<typename object> constexpr friend auto& get(tuple_storage& t) { return obj_get<object, 0>(t); }
+  template<typename object> constexpr static bool obj_check(const auto&) { return false; }
+  template<typename object, template<typename...>class holder, typename factory, typename... tail> constexpr static bool obj_check(const holder<factory, object, tail...>&) { return true; }
+  template<typename object, auto ind> constexpr static auto& obj_get(tuple_storage& obj) {
+    if constexpr(obj_check<object>(get<ind>(obj))) return get<ind>(obj);
+    else return obj_get<object, ind+1>(obj);
+  }
+#endif
 };
 constexpr auto mk_tuple(auto&&... items) {
   return [&]<auto... inds>(std::index_sequence<inds...>){
-    struct tuple_storage : tuple_value<std::decay_t<decltype(items)>, inds>... {
-      using tuple_value<std::decay_t<decltype(items)>, inds>::g...;
-      constexpr decltype(sizeof...(items)) size() const { return sizeof...(items); }
-    };
-    return tuple_storage{std::forward<decltype(items)>(items)...};
+    return tuple_storage<tuple_value<std::decay_t<decltype(items)>, inds>...>{std::forward<decltype(items)>(items)...};
   }(std::make_index_sequence<sizeof...(items)>{});
 }
 

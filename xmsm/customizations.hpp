@@ -125,4 +125,12 @@ template<typename scenario, typename transaction, typename next> constexpr void 
   }
 }
 
+template<auto at_least, auto cmd> constexpr bool call_if_need_not_enough_data(const auto& f, auto* buf, auto sz) {
+  if (sz < at_least) {
+    if constexpr(requires{on_not_enough_syn_data<cmd>(f, buf, sz);}) on_not_enough_syn_data<cmd>(f, buf, sz);
+    return true;
+  }
+  return false;
+}
+
 }

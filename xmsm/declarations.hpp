@@ -10,7 +10,7 @@
 
 namespace xmsm {
 
-enum class sync_command{ sync, move_to };
+enum class sync_command{ sync, move_to, move_to_response, sync_multi, move_to_response_multi };
 enum class scenario_state { ready, broken, fired };
 
 template<typename factory, typename object> struct basic_scenario ;

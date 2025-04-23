@@ -90,6 +90,7 @@ template<typename factory, typename object> struct basic_scenario {
   friend constexpr auto allow_move(const basic_scenario&) { return modificators::allow_move{}; }
   template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
   template<typename sc, typename st> friend constexpr auto try_move_to(const basic_scenario&) { return modificators::try_move_to<sc, st>{}; }
+  template<typename type> friend constexpr auto __entity(const basic_scenario&) { return modificators::entity<type>{}; }
   template<typename type> friend constexpr auto mk_change(const basic_scenario&) { return type_c<type>; }
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
@@ -99,13 +100,28 @@ template<typename factory, typename object> struct basic_scenario {
     if constexpr (requires{i().is_finish_state;}) return i().st==decltype(st){};
     else return 0;
   }(i));});}
+  constexpr static auto entity_list() {
+    constexpr auto ret = unpack(info{}, [](auto i){return requires{decltype(+i)::is_entity;};}, [](auto... e){return (type_list{}<<...<<e().type);});
+    static_assert( is_multi() || size(ret) < 2, "only multi scenario can have more then one entity" );
+    if constexpr(size(ret)==0) {
+      if constexpr(requires{typename factory::default_entity;}) return type_list<typename factory::default_entity>{};
+      else {
+        static_assert( !requires{ typename factory::entity; }, "if factory defines entity there is should not to be scenario without entity (or the factory should to provide default_entity)" );
+        return ret;
+      }
+    }
+    else return ret;
+  }
   constexpr static auto entity() {
+    return first(entity_list());
+    /*
     if constexpr (requires{typename object::entity;}) return type_c<typename object::entity>;
     else if constexpr (requires{ typename factory::default_entity; }) return type_c<typename factory::default_entity>;
     else {
       static_assert( !requires{ typename factory::entity; }, "if factory defines entity there is should not to be scenario without entity (or the factory should to provide default_entity)" );
       return type_c<>;
     }
+    */
   }
   constexpr static bool is_remote() {
     return entity() != utils::factory_entity<factory>();
@@ -180,6 +196,16 @@ template<typename factory, typename object> struct basic_scenario {
       static_assert(dup_cnt ==0, "hash collision in events found" );
     }
     return list;
+  }
+  constexpr static auto initial_state() {
+    return first(all_states());
+  }
+  constexpr static auto transactions_for_move_to(auto&& cur_hash, auto&& check, auto&& exec) {
+    return foreach(all_trans_info(), [&](auto t) {
+      bool match = cur_hash==hash<factory>(decltype(+t)::from) && check(decltype(+t)::to) && decltype(+t)::is_queue_allowed;
+      if constexpr (decltype(+t)::is_move_allowed) return match && exec(t);
+      else return match;
+    });
   }
 };
 

@@ -26,6 +26,11 @@ template<check_expression e> struct stack_by_expression {
   constexpr static auto expression = type_c<e>;
 };
 
+template<typename t> struct entity {
+  constexpr static bool is_entity = true;
+  constexpr static auto type = type_c<t>;
+};
+
 template<typename type> struct def_state {
   constexpr static bool is_def_state = true;
   constexpr static auto st = type_c<type>;

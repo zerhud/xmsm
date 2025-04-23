@@ -38,7 +38,7 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr static bool is_mod_when_requires() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_when!=type_c<>)); }); }
   constexpr static auto mk_states_type(const auto& f) {
     return unpack(all_states(), [&]([[maybe_unused]] auto... states) {
-      static_assert( size(all_states()) == size((type_list{}<<...<<decltype(std::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
+      static_assert( size(all_states()) == size(((type_list{}<<base::initial_state())<<...<<decltype(std::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
       return mk_variant< decltype(+std::declval<base>().ch_type(states))... >(f);
     });
   }
@@ -64,14 +64,16 @@ struct single_scenario : basic_scenario<factory, object> {
   user_type obj;
   decltype(mk_states_type(std::declval<factory>())) state;
   [[no_unique_address]] decltype(mk_stack_type(std::declval<factory>())) stack;
-  scenario_state _own_state{scenario_state::ready};
+  scenario_state _own_state : 7 {scenario_state::ready};
+  bool synced  : 1 {true};
   [[no_unique_address]] decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
 
   constexpr explicit single_scenario(factory f) : single_scenario(std::move(f), user_type{}) {}
   constexpr explicit single_scenario(factory f, user_type uo) : base(std::move(f)), obj(std::move(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
 
+  constexpr bool is_synced() const {return synced;}
   constexpr scenario_state own_state() const { return this->_own_state; }
-  constexpr void reset_own_state() noexcept { _own_state=scenario_state::ready; }
+  constexpr void reset_own_state() noexcept { _own_state = scenario_state::ready; }
   constexpr auto cur_state_hash() const {
     return unpack(all_states(), [&](auto... st) {
       constexpr static decltype(hash<factory>(first(all_states()))) hashes[] = {hash<factory>(st)...};
@@ -128,11 +130,8 @@ struct single_scenario : basic_scenario<factory, object> {
     return move_to_or_wait_cond(e, [](auto to)->bool{return (0+...+(type_c<target> == to));}, std::forward<decltype(scenarios)>(scenarios)...);
   }
   constexpr bool move_to_or_wait_cond(const auto& e, auto&& fnc, auto&&...scenarios) {
-    auto cur_hash = cur_state_hash();
-    return foreach(all_trans_info(), [&](auto t) {
-      bool match = cur_hash==hash<factory>(decltype(+t)::from) && fnc(decltype(+t)::to) && decltype(+t)::is_queue_allowed;
-      if constexpr (decltype(+t)::is_move_allowed) return match && exec_trans<decltype(+t)>(e, scenarios...)==trans_check_result::done;
-      else return match;
+    return base::transactions_for_move_to(cur_state_hash(), fnc, [&](auto t) {
+      return exec_trans<decltype(+t)>(e, scenarios...)==trans_check_result::done;
     });
   }
 private:
@@ -159,7 +158,7 @@ private:
         return f;
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);
-      if (fail || !found) {
+      if (fail || !found || !move_to_tracker.is_active()) {
         force_move_to<decltype(+mod.fail_state)>(e, scenarios...);
         move_to_tracker.update(this, e, scenarios...);
       }
@@ -205,6 +204,7 @@ private:
     pop_stack(e, [&](auto& frame){return check_contains(ind, frame.back_event_non_zero_ids);});
   }
   template<typename next_type> constexpr auto& make_next_state(auto tinfo, auto& next) {
+    synced = false;
     constexpr bool is_stack_required = tinfo.mod_stack_by_event==type_c<> && tinfo.mod_stack_by_expression==type_c<>;
     if constexpr (is_stack_required) return variant_emplace<next_type>(this->f, cur_state(), next);
     else {

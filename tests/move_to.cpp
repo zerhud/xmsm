@@ -53,7 +53,7 @@ struct ts_with_try_move_to {
 
 using xm_ts_q = xmsm::scenario<factory, ts_with_queue>;
 using xm_ts_m = xmsm::scenario<factory, ts_with_move_to>;
-using xm_ts_t = xmsm::scenario<factory,  ts_with_try_move_to>;
+using xm_ts_t = xmsm::scenario<factory, ts_with_try_move_to>;
 
 constexpr auto mk_s_queue(){struct{xm_ts_q q{factory{}}; xm_ts_m m{factory{}}; xm_ts_t t{factory{}};}ret; return ret;}
 static_assert( [] {
@@ -123,6 +123,13 @@ static_assert( [] {
   s_q.on(event<0>{}, s, s_t); s.on_other_scenarios_changed(event<0>{}, s_q, s_t);
   return s.in_state<state<100>>();
 }() == true, "cannot backward state" );
+static_assert( [] {
+  auto [s_q, s, s_t] = mk_s_queue();
+  s_q.on(event<0>{}, s);
+  auto ret = s_q.in_state<state<1>>();
+  s.on(event<1>{}, s_q, s_t); s.on_other_scenarios_changed(event<1>{}, s_q, s_t);
+  return ret + 2*s_q.in_state<state<1>>() + 4*s.in_state<state<2>>();
+}() == 7, "move_to works if no allow_move transaction exists" );
 
 
 struct ts_with_queue2 {

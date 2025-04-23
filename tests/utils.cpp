@@ -16,9 +16,10 @@ using namespace std::literals;
 
 struct foo;
 namespace test::t::t{ template<auto i>struct bar{}; }
+static_assert( name<tests::factory>(xmsm::type_c<>) == "void"sv );
 static_assert( name<tests::factory>(xmsm::type_c<foo>) == "foo"sv );
 static_assert( name<tests::factory>(xmsm::type_c<test::t::t::bar<3>>) == "test::t::t::bar<3>"sv );
-static_assert( hash<tests::factory>(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool" );
+static_assert( hash<tests::factory>(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool is matched with xmsm::hash" );
 
 static_assert( xmsm::type_c<foo> == xmsm::type_c<foo> );
 static_assert( xmsm::type_c<int> != xmsm::type_c<foo> );

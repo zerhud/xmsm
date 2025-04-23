@@ -10,38 +10,20 @@
 
 #include "hana.hpp"
 #include "scenario.hpp"
+#include "distribution.hpp"
 
 namespace xmsm {
 
-struct fake_connector {
-  constexpr static void on_start() {}
-  constexpr static void on_finish() {}
-  constexpr static int* allocate() { return nullptr; }
-  template<typename> constexpr static void send(auto&&...){}
-};
-
 template<typename factory, typename... scenarios_t>
 struct machine {
-  constexpr static auto max_command_data_size() {
-    constexpr auto sync_cmd = 2 + unpack(type_list<scenarios_t...>{}, [](auto... s) { return (0+...+!basic_scenario<factory,decltype(+s)>::is_remote()); });
-    constexpr auto move_to_cmd = unpack(type_list<scenarios_t...>{}, [](auto... s) { return (2+...+[](auto s) {
-      return unpack(basic_scenario<factory, decltype(+s)>::all_trans_info(), [](auto...t) { return (0+...+t().is_queue_allowed); });
-    }(s));});
-    return sync_cmd*(move_to_cmd<sync_cmd) + move_to_cmd*(sync_cmd<=move_to_cmd);
-  }
-
   using hash_type = decltype(hash<factory>(type_c<factory>));
-  constexpr static auto mk_connector(const auto& f) {
-    if constexpr(!remote_exists()) return fake_connector{};
-    else {
-      return typename factory::template connector<max_command_data_size()>{};
-    }
-  }
+  using connector_type = decltype(distribution::mk_connector<factory, scenarios_t...>(std::declval<factory>()));
+
   constexpr static auto mk_scenarios(const auto& f) {
     auto mk = [&](auto t){
       using base_type = basic_scenario<factory,decltype(+t)>;
       auto type = [&](auto t) {
-        if constexpr(base_type::is_remote()) return type_c<decltype(mk_connector(f))>;
+        if constexpr(base_type::is_remote()) return type_c<connector_type>;
         else return base_type{f}.ch_type(t);
       }(t);
       if constexpr(base_type::is_remote() || base_type::is_multi())
@@ -53,21 +35,24 @@ struct machine {
 
   template<typename ent> constexpr static bool is_on_ent() { return type_c<ent> == utils::factory_entity<factory>();}
   constexpr static auto place() { return hash<factory>(utils::factory_entity<factory>()); }
-  constexpr static auto entity_list() {
-    return (type_list{} << ... << basic_scenario<factory, scenarios_t>::entity());
-  }
+  constexpr static auto entity_list() { return (type_list{} << ... << basic_scenario<factory, scenarios_t>::entity_list()); }
 
-  constexpr explicit machine(factory f) : f(std::move(f)), scenarios(mk_scenarios(this->f)), connector(mk_connector(this->f)) {
+  constexpr explicit machine(factory f) : f(std::move(f)), scenarios(mk_scenarios(this->f)), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
     foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
   }
-  constexpr static bool remote_exists() { return (0+...+basic_scenario<factory, scenarios_t>::is_remote()); }
+  constexpr machine(const machine& other) : f(other.f), scenarios(other.scenarios), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
+    foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
+  }
+  constexpr machine(machine&& other) : f(std::move(other.f)), scenarios(std::move(other.scenarios)), connector(std::move(other.connector)) {
+    foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
+  }
 
   factory f;
   decltype(mk_scenarios(std::declval<factory>())) scenarios;
-  [[no_unique_address]] decltype(mk_connector(std::declval<factory>())) connector;
+  [[no_unique_address]] connector_type connector;
 
   constexpr void try_to_repair(auto&& event) {
-    sync_scenarios(event);
+    coordinate_scenarios(event);
     reset_states();
   }
   constexpr auto on(auto&& event) {
@@ -80,17 +65,48 @@ struct machine {
       });
       return false;
     });
-    sync(event);
+    sync<sync_command::sync, sync_command::sync_multi>(event);
     connector.on_finish();
   }
-  template<auto cmd> constexpr auto from_remote(const auto* buf, auto sz) {
+  template<auto cmd> constexpr void from_remote(const auto* buf, auto sz) {
     connector.on_start();
-    if constexpr(cmd==sync_command::sync) from_remote_sync(buf, sz);
-    else if constexpr(cmd==sync_command::move_to) from_remote_move_to(buf, sz);
+    if constexpr(cmd==sync_command::move_to) from_remote_move_to(buf, sz);
+    else if constexpr(cmd==sync_command::move_to_response) from_remote_sync(buf, sz);
+    else if constexpr(cmd==sync_command::sync) {
+      from_remote_sync(buf, sz);
+      if (!is_synced()) sync_with_event<sync_command::sync, sync_command::sync_multi, decltype(all_events())>(buf[1], [](const auto&){});
+    }
+    else if constexpr(cmd==sync_command::sync_multi) {
+      from_remote_sync_multi(buf, sz);
+      sync_with_event<sync_command::sync, sync_command::sync_multi, decltype(all_events())>(buf[1], [](const auto&){});
+    }
+    else if constexpr(cmd==sync_command::move_to_response_multi) {
+      from_remote_sync_multi(buf, sz);
+    }
+    else static_assert( false, "not all command handled here" );
     connector.on_finish();
+  }
+  template<auto clang20_compile_issue> constexpr void from_remote_rt(auto cmd, const auto* buf, auto sz) {
+    //NOTE: CLANG21: the template parameter is unused, clang can't compile without it if call the from_remote_rt right inside the connector (connector::end_sync_multi_scenario)
+    if (cmd==(int)sync_command::move_to) return from_remote<sync_command::move_to>(buf, sz);
+    if (cmd==(int)sync_command::move_to_response) return from_remote<sync_command::move_to_response>(buf, sz);
+    if (cmd==(int)sync_command::sync) return from_remote<sync_command::sync>(buf, sz);
+    if (cmd==(int)sync_command::sync_multi) return from_remote<sync_command::sync_multi>(buf, sz);
+    if (cmd==(int)sync_command::move_to_response_multi) return from_remote<sync_command::move_to_response_multi>(buf, sz);
+    if constexpr(requires{wrong_sync_command(this->f, cmd, buf, sz);}) wrong_sync_command(this->f, cmd, buf, sz);
   }
   template<typename sc> constexpr bool is_remote() const {return unpack(scenarios, [](auto&&... list){return utils::search_scenario(type_c<sc>, list...).is_remote();});}
   template<typename sc> constexpr bool is_broken() const {return unpack(scenarios, [](auto&&... list){return utils::search_scenario(type_c<sc>, list...).own_state()==scenario_state::broken;});}
+  template<typename sc> constexpr auto scenarios_count() const { return unpack(scenarios, [](auto&&...list) {
+    auto& s = utils::search_scenario(type_c<sc>, list...);
+    if constexpr(!s.is_multi()) return 0;
+    else return s.count();
+  });}
+  template<typename sc, typename st> constexpr unsigned int in_state_count(this auto& m) {
+    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<sc>, s...);});
+    if constexpr(!get<ind>(m.scenarios).is_multi()) return get<ind>(m.scenarios).template in_state<st>();
+    else return get<ind>(m.scenarios).template count_in<st>();
+  }
   template<typename scenario, typename state> constexpr bool in_state() const {
     return unpack(scenarios, [](auto&&... s){return (0+...+s.template in_state_by_scenario<scenario,state>());});
   }
@@ -104,38 +120,60 @@ struct machine {
   template<typename scenario> constexpr friend const auto& get(const machine& m) {return get<scenario>(const_cast<machine&>(m));}
   template<auto ind> constexpr friend const auto& get(const machine& m) {return get<ind>(const_cast<machine&>(m));}
 private:
-  constexpr void sync(const auto& event) {
-    foreach_local([&](auto ent, auto&&... s) {
+  template<auto cmd_s, auto cmd_m> constexpr void sync(const auto& event) {
+    if constexpr(utils::factory_entity<factory>() != type_c<>) {
+      sync_single<cmd_s>(event);
+      sync_multi<cmd_m>(event);
+    }
+  }
+  template<auto cmd = sync_command::sync> constexpr void sync_single(const auto& event) {
+    unpack_local_to_remote<false>([&]<typename...ent>(auto&&...s){
       auto* buf = connector.allocate();
-      buf[0] = hash<factory>(utils::factory_entity<factory>());
+      buf[0] = place();
       buf[1] = event_hash(event);
-      int ind=1;(void)((buf[++ind]=s.cur_state_hash()),...);
-      connector.template send<decltype(+ent), sync_command::sync>(buf, 2+sizeof...(s));
+      int ind=1;(void)((s.synced=true,buf[++ind]=s.cur_state_hash()),...);
+      (send<cmd, ent>(connector, buf, 2+sizeof...(s)),...);
+    });
+  }
+  template<auto cmd = sync_command::sync_multi> constexpr void sync_multi(const auto& event) {
+    unpack_local_to_remote<true>([&]<typename... ent>(auto&&...ms) {
+      begin_sync_multi_scenario<cmd>(connector, hash<factory>(utils::factory_entity<factory>()), event_hash(event));
+      (void)([&](auto&s) {
+        connector.multi_scenario_count(s.count());
+        s.foreach_scenario([&](auto&s) { s.synced = true; connector.multi_scenario_state(s.cur_state_hash()); });
+      }(ms),...);
+      (sync_multi_scenario<ent, cmd>(connector),...);
+    });
+  }
+  constexpr void from_remote_sync_multi(const auto* buf, auto sz) {
+    auto source_ent = buf[0];
+    auto source_event = buf[1];
+    buf += 2; sz -= 2;
+    unpack_remote_to_local<true>([&](auto ent, auto&... s) {
+      if (hash<factory>(ent)!=source_ent) return;
+      const auto* ibuf = buf;
+      (void)([&](auto&s) {
+        if constexpr(s.is_multi()) {
+          auto cur_sz = ibuf[0];
+          s.sync_multi(++ibuf, cur_sz);
+          ibuf += cur_sz;
+        }
+      }(s),...);
     });
   }
   constexpr void from_remote_sync(const auto* buf, auto sz) {
-    if (sz<3) {
-      if constexpr(requires{on_not_enough_syn_data<sync_command::sync>(f, buf, sz);}) on_not_enough_syn_data<sync_command::sync>(f, buf, sz);
-      return;
-    }
-    foreach_remote([&](auto ent, auto&&... s) {
-      if (hash<factory>(ent) == buf[0]) {
-        if constexpr(requires{on_not_enough_syn_data<sync_command::sync>(f, buf, sz);}) if (sz < sizeof...(s)+2) on_not_enough_syn_data<sync_command::sync>(f, buf, sz);
-        if (sz >= sizeof...(s)+2) {
-          int i=1;
-          (void)((s.state(buf[++i])),...);
-        }
+    if (call_if_need_not_enough_data<3, sync_command::sync>(f, buf, sz)) return;
+    unpack_remote_to_local<false>([&](auto ent, auto&&... s) {
+      if (hash<factory>(ent) == buf[0] && !call_if_need_not_enough_data<sizeof...(s)+2, sync_command::sync>(f, buf, sz)) {
+        int i=1;
+        (void)((s.state(buf[++i])),...);
       }
     });
-    if (is_fired()) sync_with_event<decltype(all_events())>(buf[1], [](const auto&){});
   }
   constexpr void from_remote_move_to(const auto* buf, auto sz) {
-    if (sz<3) {
-      if constexpr(requires{on_not_enough_syn_data<sync_command::move_to>(f, buf, sz);}) on_not_enough_syn_data<sync_command::move_to>(f, buf, sz);
-      return;
-    }
+    if (call_if_need_not_enough_data<3, sync_command::move_to>(f, buf, sz)) return;
     foreach(scenarios, [&](auto&&s) {
-      if constexpr(!s.is_remote()) if (s.own_hash()==buf[0]) return sync_with_event<decltype(s.all_events())>(buf[1], [&](const auto& event) {
+      if constexpr(!s.is_remote()) if (s.own_hash()==buf[0]) return sync_with_event<sync_command::move_to_response, sync_command::move_to_response_multi, decltype(s.all_events())>(buf[1], [&](const auto& event) {
         unpack(scenarios, [&](auto&...others) {
           s.move_to_or_wait_cond(event, [&](auto to)->bool {
             for (auto i=2;i<sz;++i) if (buf[i]==hash<factory>(to)) return true;
@@ -147,33 +185,33 @@ private:
       return false;
     });
   }
-  template<typename event_list> constexpr auto sync_with_event(auto ehash, auto&& payload) {
+  template<auto cmd_s, auto cmd_m, typename event_list> constexpr auto sync_with_event(auto ehash, auto&& payload) {
     return foreach(event_list{}, [&](auto cur_event) {
       if (hash<factory>(cur_event)==ehash) {
         auto event = create_object<decltype(+cur_event)>(this->f);
         payload(event);
-        sync_scenarios(event);
-        if (is_fired()) {
-          reset_states();
-          sync(event);
-        }
+        coordinate_scenarios(event);
+        if (!is_synced()) sync<cmd_s, cmd_m>(event);
         return true;
       }
       return false;
     });
   }
+  constexpr bool is_synced() const {return unpack(scenarios, [](const auto& s){ return !s.is_remote();}, [](auto&&... list){return (0+...+list.is_synced())==sizeof...(list);});}
   constexpr bool is_fired() const {return unpack(scenarios, [](auto&&... list){return (0+...+(list.own_state()==scenario_state::fired));});}
-  template<bool multi=false> constexpr void foreach_local(auto&& fnc) {
+  template<bool multi=false> constexpr void unpack_local_to_remote(auto&& fnc) {
+    unpack(entity_list(), [](auto e){return e!=utils::factory_entity<factory>();}, [&](auto... ent) {
+      unpack(scenarios, [](const auto& s){return !s.is_remote() && s.is_multi()==multi;}, [&](auto&&...ms) {
+        fnc.template operator()<decltype(+ent)...>(ms...);
+      });
+    });
+  }
+  template<bool multi=false> constexpr void unpack_remote_to_local(auto&& fnc) {
     foreach(entity_list(), [&](auto ent) { if constexpr (ent!=utils::factory_entity<factory>()) {
-      unpack(scenarios, [](const auto& s){ return !s.is_remote() && s.is_multi()==multi; }, [&](auto&&...s) { fnc(ent, s...); });
+      unpack(scenarios, [](const auto& s){ return s.is_remote() && s.is_multi()==multi && contains(s.entity_list(),decltype(ent){}); }, [&](auto&&...s) { fnc(ent, s...); });
     } return false; });
   }
-  template<bool multi=false> constexpr void foreach_remote(auto&& fnc) {
-    foreach(entity_list(), [&](auto ent) { if constexpr (ent!=utils::factory_entity<factory>()) {
-      unpack(scenarios, [](const auto& s){ return s.is_remote() && s.is_multi()==multi; }, [&](auto&&...s) { fnc(ent, s...); });
-    } return false; });
-  }
-  constexpr void sync_scenarios(auto& event) {
+  constexpr void coordinate_scenarios(auto& event) {
     foreach(scenarios, [&](auto& s) {
       unpack(scenarios, [&](auto&&...others) {
         (void)(others.on_other_scenarios_changed(event, others...),...);

@@ -123,8 +123,7 @@ struct state_queue_tracker_multi {
         return (0+...+( inds*(hash<factory>(get<inds>(st_list))==h) ));
       }(std::make_index_sequence<size(st_list)>{});
     }
-    constexpr static auto scenario_maximum(const auto& s) {
-      auto cur_hash = s.cur_state_hash();
+    constexpr static auto scenario_maximum(auto cur_hash) {
       auto cur_max = 0;
       [&]<auto... inds>(std::index_sequence<inds...>){
         ([&](auto ind, auto st_list) {
@@ -140,7 +139,7 @@ struct state_queue_tracker_multi {
       if (n==0) return ;
       auto ind=0;
       auto half = n/2;
-      s.foreach_scenario([&](const auto& s) {
+      s.foreach_scenario_state([&](const auto& s) {
         auto cur_max = scenario_maximum(s);
         max_steps = cur_max*(max_steps<cur_max);
         sum += cur_max;
@@ -165,9 +164,7 @@ struct state_queue_tracker_multi {
     if (is_active()) return;
     info.calculate(ms);
   }
-  template<typename other_scenario, typename user_type> constexpr bool update(const xmsm::scenario<factory, other_scenario, user_type>& s) {
-    return false;
-  }
+  template<typename other_scenario, typename user_type> constexpr static bool update(const xmsm::scenario<factory, other_scenario, user_type>&) { return false; }
   template<typename user_type> constexpr bool update(const xmsm::scenario<factory, scenario, user_type>& s) {
     report_info cur_info{};
     cur_info.calculate(s);

@@ -70,6 +70,13 @@ struct multi_scenario : basic_scenario<factory, object> {
   template<typename id_type> constexpr single_scenario_type* find_scenario(const id_type& id) {
     return xmsm_find_pointer(this->f, scenarios, id);
   }
+  constexpr bool is_synced() const {
+    for (auto& _s:scenarios) {
+      auto& [_,s] = _s;
+      if (!s.is_synced()) return false;
+    }
+    return true;
+  }
   constexpr auto own_state() const {
     for (auto& _s:scenarios) {
       auto& [_,s] = _s;
@@ -84,8 +91,9 @@ struct multi_scenario : basic_scenario<factory, object> {
     clean_scenarios();
   }
   constexpr void on(const auto& e, auto&&... others) {
-    if constexpr (!contains(start_events(), type_dc<decltype(e)>)) foreach_scenario([&](auto& s){s.on(e, others...);});
-    else {
+    if constexpr (!contains(start_events(), type_dc<decltype(e)>)) {
+      foreach_scenario([&](auto& s){s.on(e, others...);});
+    } else {
       auto& [_,s] = xmsm_insert_or_emplace( scenarios, user_id_gen(e), single_scenario_type{this->f, create_object<user_type>(this->f)} );
       s._own_state = scenario_state::fired;
     }
@@ -127,6 +135,12 @@ struct multi_scenario : basic_scenario<factory, object> {
     for (auto& entry : self.scenarios) {
       auto& [_,scenario] = entry;
       fnc(scenario);
+    }
+  }
+  constexpr void foreach_scenario_state(auto&& fnc) const {
+    for (auto& entry:scenarios) {
+      auto& [_,scenario] = entry;
+      fnc(scenario.cur_state_hash());
     }
   }
 private:
