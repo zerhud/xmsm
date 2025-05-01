@@ -19,6 +19,8 @@ template<auto v> using event = tests::event<v>;
 struct entity_1 {};
 struct entity_2 {};
 struct entity_3 {};
+struct entity_4 {};
+struct entity_5 {};
 
 template<auto max_cmd_data> struct connector;
 struct basic_factory : tests::factory {
@@ -28,23 +30,23 @@ struct basic_factory : tests::factory {
 struct factory_default : basic_factory { };
 struct factory_e2 : basic_factory { using entity = entity_2; };
 struct factory_e3 : basic_factory { using entity = entity_3; };
+struct factory_e4 : basic_factory { using entity = entity_4; };
+struct factory_e5 : basic_factory { using entity = entity_5; };
 
 struct ts_queue_e2 {
-  using entity = entity_2;
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
       , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
       , mk_qtrans<state<0>, state<2>, event<1>>(f, allow_move(f))
-      , __entity<entity_2>(f)
+      , entity<entity_2>(f)
     );
   }
 };
 struct ts_when_e2 {
-  using entity = entity_2;
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
       , mk_trans<state<0>, state<1>>(f, when(f, in<ts_queue_e2, state<1>>(f) && affected<ts_queue_e2>(f)))
-      , __entity<entity_2>(f)
+      , entity<entity_2>(f)
     );
   }
 };
@@ -58,18 +60,16 @@ struct ts_no_entity {
   }
 };
 struct ts_e3 {
-  using entity = entity_3;
   static auto describe_sm(const auto& f) {
     return mk_sm_description(f
       , mk_qtrans<state<0>, state<1>, event<1>>(f, allow_move(f))
       , mk_qtrans<state<1>, state<2>, event<1>>(f, allow_move(f))
       , mk_qtrans<state<2>, state<3>, event<1>>(f, allow_move(f))
-      , __entity<entity_3>(f)
+      , entity<entity_3>(f)
     );
   }
 };
 struct ts_multi_e1 {
-  using entity = entity_1;
   static auto describe_sm(const auto& f) {
     return mk_multi_sm_description(f
       , mk_qtrans<state<0>, state<1>, event<0>>(f, allow_move(f))
@@ -77,43 +77,63 @@ struct ts_multi_e1 {
       , mk_trans<state<1>, state<3>, event<111>>(f, allow_move(f))
       , mk_trans<state<1>, state<100>, event<110>>(f, allow_move(f))
       , start_event<event<100>>(f), finish_state<state<100>>(f)
-      , __entity<entity_1>(f)
+      , entity<entity_1>(f)
     );
   }
 };
 struct ts_multi_e2 {
-  using entity = entity_2;
   static auto describe_sm(const auto& f) {
     return mk_multi_sm_description(f
       , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_multi_e1, state<2>, state<100>>(f))
       , mk_trans<state<1>, state<100>>(f, allow_move(f))
       , start_event<event<100>>(f), finish_state<state<100>>(f)
-      , __entity<entity_2>(f)
+      , entity<entity_2>(f)
     );
   }
 };
 struct ts_multi_e2_2 {
-  using entity = entity_2;
   static auto describe_sm(const auto& f) {
     return mk_multi_sm_description(f
       , mk_trans<state<0>, state<1>, event<0>>(f, move_to<ts_multi_e1, state<2>, state<200>>(f))
       , mk_trans<state<0>, state<50>, event<5>>(f) , mk_trans<state<50>, state<51>, event<5>>(f) , mk_trans<state<51>, state<52>, event<5>>(f) , mk_trans<state<52>, state<53>, event<5>>(f)
       , mk_trans<state<1>, state<200>>(f, allow_move(f))
       , start_event<event<200>>(f), finish_state<state<200>>(f)
-      , __entity<entity_2>(f)
+      , entity<entity_2>(f)
+    );
+  }
+};
+struct ts_sep_e4 {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_qtrans<state<0>, state<1>, event<1>>(f, allow_move(f))
+      , mk_trans<state<1>, state<0>, event<0>>(f)
+      , entity<entity_4>(f)
+    );
+  }
+};
+struct ts_sep_e5 {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+    , mk_trans<state<0>, state<1>, event<1>>(f, move_to<ts_sep_e4, state<1>, state<100>>(f))
+    , mk_trans<state<1>, state<0>, event<0>>(f)
+    , entity<entity_5>(f)
     );
   }
 };
 
-template<typename factory> using machine = xmsm::machine<factory, ts_no_entity, ts_queue_e2, ts_when_e2, ts_multi_e1, ts_multi_e2, ts_multi_e2_2, ts_e3>;
+template<typename factory> using machine = xmsm::machine<factory, ts_no_entity, ts_queue_e2, ts_when_e2, ts_multi_e1, ts_multi_e2, ts_multi_e2_2, ts_e3, ts_sep_e4, ts_sep_e5>;
 using machine1 = machine<factory_default>;
 using machine2 = machine<factory_e2>;
 using machine3 = machine<factory_e3>;
+using machine4 = machine<factory_e4>;
+using machine5 = machine<factory_e5>;
 
 template<auto max_cmd_size> struct connector {
   machine1* m1;
   machine2* m2;
   machine3* m3;
+  machine4* m4;
+  machine5* m5;
   uint32_t buf[max_cmd_size]{};
 
   uint32_t multi_cmd{};
@@ -130,6 +150,8 @@ template<auto max_cmd_size> struct connector {
     if constexpr(machine1::is_on_ent<ent>()) self.m1->from_remote<cmd>(buf, sz);
     else if constexpr(machine2::is_on_ent<ent>()) self.m2->from_remote<cmd>(buf, sz);
     else if constexpr(machine3::is_on_ent<ent>()) self.m3->from_remote<cmd>(buf, sz);
+    else if constexpr(machine4::is_on_ent<ent>()) self.m4->from_remote<cmd>(buf, sz);
+    else if constexpr(machine5::is_on_ent<ent>()) self.m5->from_remote<cmd>(buf, sz);
     else throw __LINE__;
   }
 
@@ -163,12 +185,15 @@ constexpr auto mk_m() {
     machine1 m1{factory_default{}};
     machine2 m2{factory_e2{}};
     machine3 m3{factory_e3{}};
+    machine4 m4{factory_e4{}};
+    machine5 m5{factory_e5{}};
   } ret{};
   return ret;
 }
-constexpr void connect(auto& m1, auto& m2, auto& m3) {
+constexpr void connect(auto& m1, auto& m2, auto& m3, auto& m4, auto& m5) {
   m1.connector.m2=&m2; m1.connector.m3=&m3;
   m2.connector.m1=&m1; m2.connector.m3=&m3;
   m3.connector.m1=&m1; m3.connector.m2=&m2;
+  m4.connector.m5=&m5; m5.connector.m4=&m4;
 }
 

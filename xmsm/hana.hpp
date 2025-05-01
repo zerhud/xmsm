@@ -63,9 +63,9 @@ template<typename... items> constexpr auto index_of(const type_list<items...>&, 
   const bool found = ( false || ... || (++ind,type_c<items> <= item) );
   return (-1*!found) + ind*found;
 }
-template<typename factory, typename... items> constexpr auto index_of_by_hash(const type_list<items...>&, auto target_hash) {
+template<typename... items> constexpr auto index_of_by_hash(const type_list<items...>&, auto target_hash) {
   auto ind=-1;
-  const bool found = (false || ... || (++ind,hash<factory>(type_c<items>)==target_hash));
+  const bool found = (false || ... || (++ind,hash(type_c<items>)==target_hash));
   return (-1*!found) + ind*found;
 }
 constexpr auto find(const auto& list, auto item) {
@@ -99,6 +99,7 @@ consteval auto max_size(auto&&... lists) {
 template<typename type> constexpr auto _name(_type_c<type>) {
   auto len = []<auto N>(const char(&str)[N]){return (unsigned)(N-1);};
   constexpr auto pref_len =
+  //TODO: add msvc??
 #ifdef __clang__
     len("auto xmsm::_name(_type_c<type>) [type = ")
 #else
@@ -119,15 +120,15 @@ template<typename factory, typename type> constexpr auto name(_type_c<type>) {
   return sv{vec.base, vec.size};
 }
 
-template<typename factory> constexpr auto hash32(auto type) {
-  auto src = name<factory>(type);
-  return hash32(src.data(), src.size(), 0);
+constexpr auto hash32(auto type) {
+  constexpr auto src = _name(type);
+  return hash32(src.base, src.size, 0);
 }
-template<typename factory> constexpr auto hash64(auto type) {
-  auto src = name<factory>(type);
-  return hash64(src.data(), src.size(), 0);
+constexpr auto hash64(auto type) {
+  constexpr auto src = _name(type);
+  return hash64(src.base, src.size, 0);
 }
-template<typename factory> constexpr auto hash(auto type) { return hash32<factory>(type); }
+constexpr auto hash(auto type) { return hash32(type); }
 
 template<typename type, auto ind> struct tuple_value {
   type value;

@@ -58,21 +58,21 @@ struct state_queue_tracker {
 
   constexpr static auto get_state(auto st_list, auto ind) {
     return [&]<auto...inds>(std::index_sequence<inds...>){
-      return (0+...+((inds==ind)*hash<factory>(get<inds>(st_list))));
+      return (0+...+((inds==ind)*hash(get<inds>(st_list))));
     }(std::make_index_sequence<size(st_list)>{});
   }
   constexpr void activate(auto cur_hash) {
     if (is_active()) return;
-    if (cur_hash==hash<factory>(last(first(list{})()))) return;
+    if (cur_hash==hash(last(first(list{})()))) return;
     [&]<auto...inds>(std::index_sequence<inds...>){
       (void) (0 + ... + [&](auto ind, auto st_list) {
-        return indexes[ind] = index_of_by_hash<factory>(st_list(), cur_hash);
+        return indexes[ind] = index_of_by_hash(st_list(), cur_hash);
       }(inds, get<inds>(list{})));
     }(std::make_index_sequence<size(list{})>{});
   }
   constexpr bool check_and_shift_state(auto cur_hash) {
     if (!is_active()) return true;
-    if (cur_hash==hash<factory>(last(first(list{})()))) {deactivate(); return true;}
+    if (cur_hash==hash(last(first(list{})()))) {deactivate(); return true;}
     return [&]<auto...inds>(std::index_sequence<inds...>){
       return (0 + ... + [&](auto ind, auto st_list) {
         if (indexes[ind]<0) return false;
@@ -84,7 +84,7 @@ struct state_queue_tracker {
   }
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
     static_assert( !basic_scenario<factory, scenario>::is_multi() );
-    auto scenario_cur_hash  = utils::cur_state_hash_from_set<factory, scenario>(others...);
+    auto scenario_cur_hash  = utils::cur_state_hash_from_set<scenario>(others...);
     if (in_state<fail_state>(*cur_scenario)) deactivate();
     else if (utils::is_broken_from_set<scenario>(others...) || !check_and_shift_state(scenario_cur_hash)) {
       cur_scenario->template force_move_to<fail_state>(e, others...);
@@ -120,7 +120,7 @@ struct state_queue_tracker_multi {
     constexpr static auto count_to_end(auto h, auto _st_list) {
       auto st_list = revert(_st_list);
       return [&]<auto... inds>(std::index_sequence<inds...>){
-        return (0+...+( inds*(hash<factory>(get<inds>(st_list))==h) ));
+        return (0+...+( inds*(hash(get<inds>(st_list))==h) ));
       }(std::make_index_sequence<size(st_list)>{});
     }
     constexpr static auto scenario_maximum(auto cur_hash) {
@@ -175,13 +175,13 @@ struct state_queue_tracker_multi {
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
     if (!is_active()) return;
     if constexpr (!basic_scenario<factory,scenario>::is_finish_state(type_c<target_state>)) {
-      if (utils::count_from_set<factory,scenario>(others...) < info.n) {
+      if (utils::count_from_set<scenario>(others...) < info.n) {
         fail(cur_scenario, e, others...);
         return;
       }
     }
     else {
-      if (utils::count_from_set<factory,scenario>(others...)==0) {
+      if (utils::count_from_set<scenario>(others...)==0) {
         deactivate();
         return;
       }
@@ -205,7 +205,7 @@ template<typename factory,typename base> struct final_tracker : base {
   constexpr void activate(auto mt, auto&&... scenarios) { if constexpr(requires{this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();}) {
     auto* self = this->template search<decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>();
     if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi()) self->activate(utils::search_scenario(mt().scenario, scenarios...));
-    else self->activate( utils::cur_state_hash_from_set<factory, decltype(+mt().scenario)>(scenarios...) );
+    else self->activate( utils::cur_state_hash_from_set<decltype(+mt().scenario)>(scenarios...) );
   }}
 };
 

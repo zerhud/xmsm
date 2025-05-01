@@ -23,7 +23,7 @@ template<typename factory> struct multi_scenario_info {
 
 template<typename factory, typename object, typename connector> struct remote_scenario : basic_scenario<factory, object> {
   using base = basic_scenario<factory, object>;
-  using hash_type = decltype(hash<factory>(type_c<factory>));
+  using hash_type = decltype(hash(type_c<factory>));
 
   using base::all_events;
 
@@ -34,7 +34,7 @@ template<typename factory, typename object, typename connector> struct remote_sc
 
   connector* con=nullptr;
 
-  constexpr explicit remote_scenario(factory f) : base(std::move(f)), cur_state(hash<factory>(base::initial_state())), multi_container(mk_multi_container(this->f)) {}
+  constexpr explicit remote_scenario(factory f) : base(std::move(f)), cur_state(hash(base::initial_state())), multi_container(mk_multi_container(this->f)) {}
   constexpr void reset_own_state() { _own_state = scenario_state::ready; }
   constexpr static void on_other_scenarios_changed(auto&&...) {}
   constexpr static void on(auto&&...) {}
@@ -54,7 +54,7 @@ template<typename factory, typename object, typename connector> struct remote_sc
   constexpr void state(auto hash) requires (!base::is_multi()) {
     _own_state = (scenario_state)((int)_own_state*(cur_state==hash)+(int)scenario_state::fired*(cur_state!=hash));
     cur_state = hash;
-    cur_state_index = index_of_by_hash<factory>(this->all_states(), cur_state_hash());
+    cur_state_index = index_of_by_hash(this->all_states(), cur_state_hash());
   }
   constexpr auto cur_state_hash() const { return cur_state; }
   template<typename state> constexpr bool in_state() const requires (!base::is_multi()) {
@@ -62,7 +62,7 @@ template<typename factory, typename object, typename connector> struct remote_sc
   }
   constexpr auto count() const requires (base::is_multi()) { return multi_container.count(); }
   template<typename _st> constexpr auto count_in() const requires (base::is_multi()) {
-    constexpr auto st_hash = hash<factory>(find(base::all_states(), type_c<_st>));
+    constexpr auto st_hash = hash(find(base::all_states(), type_c<_st>));
     auto ret = 0;
     for (auto& st:multi_container.states) ret += st==st_hash;
     return ret;
@@ -79,12 +79,12 @@ template<typename factory, typename object, typename connector> struct remote_sc
   constexpr void foreach_scenario_state(auto&& fnc) const requires (base::is_multi()) { for (auto& s:multi_container.states) fnc(s); }
 private:
   template<typename... targets> constexpr bool move_to_or_wait_for_single(auto cur_hash, const auto& event) {
-    constexpr auto event_hash = unpack(all_events(), [](auto&&... e){return (0+...+(hash<factory>(e)*(e<=type_dc<decltype(event)>)));});
+    constexpr auto event_hash = unpack(all_events(), [](auto&&... e){return (0+...+(hash(e)*(e<=type_dc<decltype(event)>)));});
     return base::transactions_for_move_to(cur_hash, [](auto to)->bool{return (0+...+(type_c<targets> == to));}, [&](auto t) {
       auto* buf = con->allocate();
       buf[0] = this->own_hash();
       buf[1] = event_hash;
-      int i=1; (void)((buf[++i]=hash<factory>(type_c<targets>)),...);
+      int i=1; (void)((buf[++i]=hash(type_c<targets>)),...);
       send<sync_command::move_to, decltype(+base::entity())>(*con, buf, sizeof...(targets)+2);
       return true;
     });

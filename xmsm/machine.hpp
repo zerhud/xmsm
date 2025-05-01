@@ -16,7 +16,7 @@ namespace xmsm {
 
 template<typename factory, typename... scenarios_t>
 struct machine {
-  using hash_type = decltype(hash<factory>(type_c<factory>));
+  using hash_type = decltype(hash(type_c<factory>));
   using connector_type = decltype(distribution::mk_connector<factory, scenarios_t...>(std::declval<factory>()));
 
   constexpr static auto mk_scenarios(const auto& f) {
@@ -34,7 +34,7 @@ struct machine {
   }
 
   template<typename ent> constexpr static bool is_on_ent() { return type_c<ent> == utils::factory_entity<factory>();}
-  constexpr static auto place() { return hash<factory>(utils::factory_entity<factory>()); }
+  constexpr static auto place() { return hash(utils::factory_entity<factory>()); }
   constexpr static auto entity_list() { return (type_list{} << ... << basic_scenario<factory, scenarios_t>::entity_list()); }
 
   constexpr explicit machine(factory f) : f(std::move(f)), scenarios(mk_scenarios(this->f)), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
@@ -119,6 +119,11 @@ struct machine {
   }
   template<typename scenario> constexpr friend const auto& get(const machine& m) {return get<scenario>(const_cast<machine&>(m));}
   template<auto ind> constexpr friend const auto& get(const machine& m) {return get<ind>(const_cast<machine&>(m));}
+  template<typename e1, typename e2> constexpr static bool need_sync() {
+    constexpr bool e1_to_e2 = (false||...||(contains(basic_scenario<factory, scenarios_t>::entity_list(), type_c<e1>) && basic_scenario<factory, scenarios_t>::template need_sync_with_ent<e2>()));
+    constexpr bool e2_to_e1 = (false||...||(contains(basic_scenario<factory, scenarios_t>::entity_list(), type_c<e2>) && basic_scenario<factory, scenarios_t>::template need_sync_with_ent<e1>()));
+    return e1_to_e2 || e2_to_e1;
+  }
 private:
   template<auto cmd_s, auto cmd_m> constexpr void sync(const auto& event) {
     if constexpr(utils::factory_entity<factory>() != type_c<>) {
@@ -137,7 +142,7 @@ private:
   }
   template<auto cmd = sync_command::sync_multi> constexpr void sync_multi(const auto& event) {
     unpack_local_to_remote<true>([&]<typename... ent>(auto&&...ms) {
-      begin_sync_multi_scenario<cmd>(connector, hash<factory>(utils::factory_entity<factory>()), event_hash(event));
+      begin_sync_multi_scenario<cmd>(connector, hash(utils::factory_entity<factory>()), event_hash(event));
       (void)([&](auto&s) {
         connector.multi_scenario_count(s.count());
         s.foreach_scenario([&](auto&s) { s.synced = true; connector.multi_scenario_state(s.cur_state_hash()); });
@@ -150,7 +155,7 @@ private:
     auto source_event = buf[1];
     buf += 2; sz -= 2;
     unpack_remote_to_local<true>([&](auto ent, auto&... s) {
-      if (hash<factory>(ent)!=source_ent) return;
+      if (hash(ent)!=source_ent) return;
       const auto* ibuf = buf;
       (void)([&](auto&s) {
         if constexpr(s.is_multi()) {
@@ -164,7 +169,7 @@ private:
   constexpr void from_remote_sync(const auto* buf, auto sz) {
     if (call_if_need_not_enough_data<3, sync_command::sync>(f, buf, sz)) return;
     unpack_remote_to_local<false>([&](auto ent, auto&&... s) {
-      if (hash<factory>(ent) == buf[0] && !call_if_need_not_enough_data<sizeof...(s)+2, sync_command::sync>(f, buf, sz)) {
+      if (hash(ent) == buf[0] && !call_if_need_not_enough_data<sizeof...(s)+2, sync_command::sync>(f, buf, sz)) {
         int i=1;
         (void)((s.state(buf[++i])),...);
       }
@@ -176,7 +181,7 @@ private:
       if constexpr(!s.is_remote()) if (s.own_hash()==buf[0]) return sync_with_event<sync_command::move_to_response, sync_command::move_to_response_multi, decltype(s.all_events())>(buf[1], [&](const auto& event) {
         unpack(scenarios, [&](auto&...others) {
           s.move_to_or_wait_cond(event, [&](auto to)->bool {
-            for (auto i=2;i<sz;++i) if (buf[i]==hash<factory>(to)) return true;
+            for (auto i=2;i<sz;++i) if (buf[i]==hash(to)) return true;
             return false;
           }, others...);
         });
@@ -187,7 +192,7 @@ private:
   }
   template<auto cmd_s, auto cmd_m, typename event_list> constexpr auto sync_with_event(auto ehash, auto&& payload) {
     return foreach(event_list{}, [&](auto cur_event) {
-      if (hash<factory>(cur_event)==ehash) {
+      if (hash(cur_event)==ehash) {
         auto event = create_object<decltype(+cur_event)>(this->f);
         payload(event);
         coordinate_scenarios(event);
@@ -200,14 +205,14 @@ private:
   constexpr bool is_synced() const {return unpack(scenarios, [](const auto& s){ return !s.is_remote();}, [](auto&&... list){return (0+...+list.is_synced())==sizeof...(list);});}
   constexpr bool is_fired() const {return unpack(scenarios, [](auto&&... list){return (0+...+(list.own_state()==scenario_state::fired));});}
   template<bool multi=false> constexpr void unpack_local_to_remote(auto&& fnc) {
-    unpack(entity_list(), [](auto e){return e!=utils::factory_entity<factory>();}, [&](auto... ent) {
+    unpack(entity_list(), [](auto e){return e!=utils::factory_entity<factory>() && need_sync<decltype(+utils::factory_entity<factory>()), decltype(+e)>();}, [&](auto... ent) {
       unpack(scenarios, [](const auto& s){return !s.is_remote() && s.is_multi()==multi;}, [&](auto&&...ms) {
         fnc.template operator()<decltype(+ent)...>(ms...);
       });
     });
   }
   template<bool multi=false> constexpr void unpack_remote_to_local(auto&& fnc) {
-    foreach(entity_list(), [&](auto ent) { if constexpr (ent!=utils::factory_entity<factory>()) {
+    foreach(entity_list(), [&](auto ent) { if constexpr (ent!=utils::factory_entity<factory>() && need_sync<decltype(+utils::factory_entity<factory>()), decltype(+ent)>()) {
       unpack(scenarios, [](const auto& s){ return s.is_remote() && s.is_multi()==multi && contains(s.entity_list(),decltype(ent){}); }, [&](auto&&...s) { fnc(ent, s...); });
     } return false; });
   }
@@ -229,7 +234,7 @@ private:
     return ret;
   }
   template<typename type> constexpr static auto event_hash(const type&) {
-    return unpack(all_events(), [](auto...list){return (0+...+(hash<factory>(list)*(list<=type_c<type>)));});
+    return unpack(all_events(), [](auto...list){return (0+...+(hash(list)*(list<=type_c<type>)));});
   }
 };
 

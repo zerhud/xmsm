@@ -76,7 +76,7 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr void reset_own_state() noexcept { _own_state = scenario_state::ready; }
   constexpr auto cur_state_hash() const {
     return unpack(all_states(), [&](auto... st) {
-      constexpr static decltype(hash<factory>(first(all_states()))) hashes[] = {hash<factory>(st)...};
+      constexpr static decltype(hash(first(all_states()))) hashes[] = {hash(st)...};
       return hashes[cur_state().index()];
     });
   }
@@ -95,7 +95,7 @@ struct single_scenario : basic_scenario<factory, object> {
       if constexpr(is_stack_with_event_required()) clean_stack(e);
       auto cur_hash = cur_state_hash();
       foreach(all_trans_info(), [&](auto t) {
-        const bool match = cur_hash==hash<factory>(decltype(+t)::from) && decltype(+t)::event <= e_type;
+        const bool match = cur_hash==hash(decltype(+t)::from) && decltype(+t)::event <= e_type;
         return match && (exec_trans<decltype(+t)>(e, scenarios...)&trans_check_result::only_if)==0;
       });
     }
@@ -122,7 +122,7 @@ struct single_scenario : basic_scenario<factory, object> {
   template<typename... target> constexpr bool move_to(const auto& e, auto&&... scenarios) {
     auto cur_hash = cur_state_hash();
     return foreach(all_trans_info(), [&](auto t) {
-      bool match = cur_hash==hash<factory>(decltype(+t)::from) && ((type_c<target> == decltype(+t)::to) || ...) && decltype(+t)::is_queue_allowed && decltype(+t)::is_move_allowed;
+      bool match = cur_hash==hash(decltype(+t)::from) && ((type_c<target> == decltype(+t)::to) || ...) && decltype(+t)::is_queue_allowed && decltype(+t)::is_move_allowed;
       return match && exec_trans<decltype(+t)>(e, scenarios...)==trans_check_result::done;
     });
   }
@@ -138,7 +138,7 @@ private:
   template<typename trans_info> constexpr bool handle_try_move_to(const auto& e, auto&&... scenarios) {
     foreach(trans_info::mod_try_move_to, [&](auto mt) {
       ([&](auto& s) {
-        bool f = s.own_hash() == hash<factory>(mt().scenario);
+        bool f = s.own_hash() == hash(mt().scenario);
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mt().state);
         if (f) size(targets)==0 || unpack(targets, [&](auto... tgts){return s.template move_to<decltype(+tgts)...>(e, scenarios...);});
       }(scenarios),...);
@@ -152,7 +152,7 @@ private:
       bool fail = false;
       move_to_tracker.activate(mt, scenarios...);
       const bool found = (false || ... || [&](auto& s) {
-        bool f = s.own_hash() == hash<factory>(mod.scenario);
+        bool f = s.own_hash() == hash(mod.scenario);
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
         if (f) fail = size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);});
         return f;
@@ -186,7 +186,7 @@ private:
     auto cur_hash = cur_state_hash();
     return foreach(all_trans_info(), [&](auto t) {
       if constexpr(decltype(+t)::mod_when!=type_c<>) {
-        if (cur_hash==hash<factory>(decltype(+t)::from) && t().mod_when().expression(scenarios...)) {
+        if (cur_hash==hash(decltype(+t)::from) && t().mod_when().expression(scenarios...)) {
           return (exec_trans<decltype(+t)>(e, scenarios...) & trans_check_result::only_if)==0;
         }
       }
@@ -198,7 +198,7 @@ private:
     pop_stack(e, [&](auto& frame){return check(frame.back_expression);});
   }
   constexpr auto clean_stack(const auto& e) /* pre(contains(all_events(), type_dc<decltype(e)>)) */ {
-    auto ind = hash<factory>(find(all_events(), type_dc<decltype(e)>));
+    auto ind = hash(find(all_events(), type_dc<decltype(e)>));
     // contract_assert( ind >= 0 );
     auto check_contains = []<auto sz>(auto val, auto(&ar)[sz]){ bool found=false; for (auto i=0;i<sz;++i) found |= ar[i]==val; return found; };
     pop_stack(e, [&](auto& frame){return check_contains(ind, frame.back_event_non_zero_ids);});
@@ -211,7 +211,7 @@ private:
       auto& ret = xmsm_emplace_back(stack, std::move(next));
       if constexpr(tinfo.mod_stack_by_event!=type_c<>) unpack(decltype(+tinfo.mod_stack_by_event)::back_events, [&](auto... events) {
         auto ind=-1;
-        (void)( true && ... && (ret.back_event_non_zero_ids[++ind]=hash<factory>(find(all_events(), events)),true));
+        (void)( true && ... && (ret.back_event_non_zero_ids[++ind]=hash(find(all_events(), events)),true));
       });
       if constexpr (tinfo.mod_stack_by_expression!=type_c<>) ret.back_expression = decltype(+decltype(+tinfo.mod_stack_by_expression)::expression){};
       return get<next_type>(ret.st);

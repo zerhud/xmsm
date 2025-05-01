@@ -52,7 +52,7 @@ template<typename factory, typename object> struct basic_scenario {
   struct multi_sm_indicator;
   factory f;
 
-  constexpr static auto own_hash() { return hash<factory>(type_c<object>); }
+  constexpr static auto own_hash() { return hash(type_c<object>); }
 
   constexpr explicit basic_scenario(factory f) : f(std::move(f)) {}
 
@@ -90,8 +90,9 @@ template<typename factory, typename object> struct basic_scenario {
   friend constexpr auto allow_move(const basic_scenario&) { return modificators::allow_move{}; }
   template<typename sc, typename st, typename fst> friend constexpr auto move_to(const basic_scenario&) { return modificators::move_to<sc, st, fst>{}; }
   template<typename sc, typename st> friend constexpr auto try_move_to(const basic_scenario&) { return modificators::try_move_to<sc, st>{}; }
-  template<typename type> friend constexpr auto __entity(const basic_scenario&) { return modificators::entity<type>{}; }
+  template<typename type> friend constexpr auto entity(const basic_scenario&) { return modificators::entity<type>{}; }
   template<typename type> friend constexpr auto mk_change(const basic_scenario&) { return type_c<type>; }
+  friend constexpr auto nothing(const basic_scenario&) { return type_c<>; }
 
   using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
 
@@ -114,14 +115,6 @@ template<typename factory, typename object> struct basic_scenario {
   }
   constexpr static auto entity() {
     return first(entity_list());
-    /*
-    if constexpr (requires{typename object::entity;}) return type_c<typename object::entity>;
-    else if constexpr (requires{ typename factory::default_entity; }) return type_c<typename factory::default_entity>;
-    else {
-      static_assert( !requires{ typename factory::entity; }, "if factory defines entity there is should not to be scenario without entity (or the factory should to provide default_entity)" );
-      return type_c<>;
-    }
-    */
   }
   constexpr static bool is_remote() {
     return entity() != utils::factory_entity<factory>();
@@ -179,8 +172,8 @@ template<typename factory, typename object> struct basic_scenario {
       constexpr auto find_fail_state = [](auto ti){return unpack(decltype(+ti)::mod_move_to, [](auto... mt){return (type_list{}<<...<<mt().fail_state);});};
       return ((((type_list{} << first(def)) << ... << decltype(+states)::from ) << ... << decltype(+states)::to) << ... << find_fail_state(states));
     });
-    static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some states (hash==0)" );
-    static_assert( unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);})==0, "hash collision in states found" );
+    static_assert( unpack(list, [](auto... i){return (true && ... && hash(i));}), "cannot correct calculate hash of some states (hash==0)" );
+    static_assert( unpack(list, [&](auto... i){return has_duplicates(hash(i)...);})==0, "hash collision in states found" );
     return list;
   }
   constexpr static auto all_events() {
@@ -190,8 +183,8 @@ template<typename factory, typename object> struct basic_scenario {
         else return type_list{} << st.event << decltype(+st.mod_stack_by_event)::back_events;
       }(decltype(+states){}));
     });
-    static_assert( unpack(list, [](auto... i){return (true && ... && hash<factory>(i));}), "cannot correct calculate hash of some events (hash==0)" );
-    if constexpr (constexpr auto dup_cnt = unpack(list, [&](auto... i){return has_duplicates(hash<factory>(i)...);}); dup_cnt!=0) {
+    static_assert( unpack(list, [](auto... i){return (true && ... && hash(i));}), "cannot correct calculate hash of some events (hash==0)" );
+    if constexpr (constexpr auto dup_cnt = unpack(list, [&](auto... i){return has_duplicates(hash(i)...);}); dup_cnt!=0) {
       list.__has_duplicates();
       static_assert(dup_cnt ==0, "hash collision in events found" );
     }
@@ -202,9 +195,33 @@ template<typename factory, typename object> struct basic_scenario {
   }
   constexpr static auto transactions_for_move_to(auto&& cur_hash, auto&& check, auto&& exec) {
     return foreach(all_trans_info(), [&](auto t) {
-      bool match = cur_hash==hash<factory>(decltype(+t)::from) && check(decltype(+t)::to) && decltype(+t)::is_queue_allowed;
+      bool match = cur_hash==hash(decltype(+t)::from) && check(decltype(+t)::to) && decltype(+t)::is_queue_allowed;
       if constexpr (decltype(+t)::is_move_allowed) return match && exec(t);
       else return match;
+    });
+  }
+  template<typename target_ent> constexpr static auto need_sync_with_ent() {
+    constexpr auto check_expr = [](auto m) {
+      constexpr auto list = [](auto m) {
+        //TODO: there is some compile issue with stack_by_expr mod, all expression have to be an expression instead of type_c<expression>
+        if constexpr(is_type_c<decltype(m)>) return m().list_scenarios();
+        else return m.list_scenarios();
+      }(m);
+      return unpack(list, [](auto...s) {
+        return (false||...||contains(basic_scenario<factory,decltype(+s)>::entity_list(), type_c<target_ent>));
+      });
+    };
+    auto check_mod = [&](auto m) {
+      if constexpr(requires{m().is_stack_by_expression;}) return check_expr(m().expression);
+      else if constexpr(requires{m().is_when;}) return check_expr(m().expression);
+      else if constexpr(requires{m().is_only_if;}) return check_expr(m().expression);
+      else if constexpr(requires{m().is_move_to;}) return contains(basic_scenario<factory, decltype(+m().scenario)>::entity_list(), type_c<target_ent>);
+      else if constexpr(requires{m().is_try_move_to;}) return contains(basic_scenario<factory, decltype(+m().scenario)>::entity_list(), type_c<target_ent>);
+      else return false;
+    };
+    return foreach(all_trans_info(), [&](auto t) {
+      if constexpr(!requires{t().is_trans_info;}) return false;
+      else return unpack(t().mods, [&](auto...m){return (false||...||check_mod(m));});
     });
   }
 };

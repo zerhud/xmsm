@@ -12,6 +12,7 @@
 #include "hana.hpp"
 
 namespace xmsm::utils {
+
 template<typename factory> constexpr auto factory_entity() {
   if constexpr(requires{ typename factory::entity; }) return type_c<typename factory::entity>;
   else if constexpr(requires{ typename factory::default_entity; }) return type_c<typename factory::default_entity>;
@@ -23,14 +24,14 @@ template<typename type, typename fnc_type> struct pointer_selector {
   template<typename factory, typename user_type> constexpr pointer_selector& operator^(scenario<factory, type, user_type>& s) { fnc(s); return *this; }
   template<typename factory, typename fail, typename user_type> constexpr pointer_selector& operator^(scenario<factory, fail, user_type>&) { return *this; }
 };
-template<typename factory, typename type> constexpr auto cur_state_hash_from_set(auto&... scenarios){
-  decltype(hash<factory>(type_c<type>)) ret{};
+template<typename type> constexpr auto cur_state_hash_from_set(auto&... scenarios){
+  decltype(hash(type_c<type>)) ret{};
   auto fnc = [&](auto& s){ret=s.cur_state_hash();};
   (void)(pointer_selector<type, decltype(fnc)>{fnc} ^...^ scenarios);
   return ret;
 }
-template<typename factory, typename type> constexpr auto count_from_set(auto&... scenarios){
-  decltype(hash<factory>(type_c<type>)) ret{};
+template<typename type> constexpr auto count_from_set(auto&... scenarios){
+  decltype(hash(type_c<type>)) ret{};
   auto fnc = [&](auto& s){ret=s.count();};
   (void)(pointer_selector<type, decltype(fnc)>{fnc} ^...^ scenarios);
   return ret;

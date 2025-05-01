@@ -23,7 +23,7 @@ template<typename e, typename... tail> struct stack_by_event {
 
 template<check_expression e> struct stack_by_expression {
   constexpr static bool is_stack_by_expression = true;
-  constexpr static auto expression = type_c<e>;
+  constexpr static auto expression = type_c<e>; //TODO: use expression here instead of type_c<e> (some compile issue with expression)
 };
 
 template<typename t> struct entity {

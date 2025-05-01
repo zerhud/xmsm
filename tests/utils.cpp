@@ -19,7 +19,7 @@ namespace test::t::t{ template<auto i>struct bar{}; }
 static_assert( name<tests::factory>(xmsm::type_c<>) == "void"sv );
 static_assert( name<tests::factory>(xmsm::type_c<foo>) == "foo"sv );
 static_assert( name<tests::factory>(xmsm::type_c<test::t::t::bar<3>>) == "test::t::t::bar<3>"sv );
-static_assert( hash<tests::factory>(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool is matched with xmsm::hash" );
+static_assert( hash(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool is matched with xmsm::hash" );
 
 static_assert( xmsm::type_c<foo> == xmsm::type_c<foo> );
 static_assert( xmsm::type_c<int> != xmsm::type_c<foo> );
@@ -51,10 +51,10 @@ static_assert( unpack_with_inds(xmsm::type_list<int,double>{}, []<auto... inds>(
 
 int main(int,char**){
   {
-    constexpr auto ct_hash = hash<tests::factory>(xmsm::type_c<tests::state<0>>);
-    auto rt_hash = hash<tests::factory>(xmsm::type_c<tests::state<0>>);
+    constexpr auto ct_hash = hash(xmsm::type_c<tests::state<0>>);
+    auto rt_hash = hash(xmsm::type_c<tests::state<0>>);
     std::cout << "cmp ct and rt hashes: " << ct_hash << "==" << rt_hash << std::endl;
     if (ct_hash!=rt_hash) throw std::runtime_error(std::to_string(__LINE__));
   }
-  std::cout << "hash64(foo) == |" << hash64<tests::factory>(xmsm::type_c<foo>) << '|' << std::endl;
+  std::cout << "hash64(foo) == |" << hash64(xmsm::type_c<foo>) << '|' << std::endl;
 }

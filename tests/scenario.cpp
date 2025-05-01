@@ -21,6 +21,7 @@ struct ts1 {
     return mk_sm_description(f
       , mk_trans<state<0>, state<1>, event<0>>(f)
       , mk_trans<state<1>, state<0>, event<1>>(f)
+      , nothing(f)
     );
   }
 };
@@ -41,7 +42,7 @@ static_assert( [] {
   xmsm::scenario<factory, ts1> s{factory{}};
   return (s.states_count()==2) + 2*(s.events_count()==2) + 4*(s.index()==0)
   + 8*s.in_state<state<0>>() + 16*!s.is_stack_with_event_required()
-  + 32*(s.cur_state_hash()==hash<factory>(xmsm::type_c<state<0>>));
+  + 32*(s.cur_state_hash()==hash(xmsm::type_c<state<0>>));
 }() == 63);
 static_assert( [] {
   xmsm::scenario<factory, ts1> s{factory{}};
