@@ -1,11 +1,12 @@
 builddir := make_build
 GCC := g++ -MMD -pipe -std=gnu++26 -fwhole-program -march=native -fdiagnostics-color=always -fdiagnostics-all-candidates 
 CLANG := clang++ -MMD -pipe -std=gnu++26 -march=native -fdiagnostics-color=always -ftemplate-backtrace-limit=0 -Wno-overloaded-shift-op-parentheses
+CLANG_UNWRAP := $(shell which -a clang++ | sed -n '2p')
 INCLUDES := -I. -I./absd -Ijiexpr -Iast_graph -Ivirtual_variant -Ijinja
 
 tests_src := $(shell find . -ipath '*/tests/*.cpp' | sed 's/^..//g')
 
-.PHONY: all force_clang
+.PHONY: all force_clang vis vis_build vb
 
 base = $(basename $(subst tests/,,$(1)))
 all: $(foreach src_file,$(tests_src),$(call base,$(src_file)))
@@ -55,3 +56,15 @@ directories := $(sort $(foreach src_file,$(tests_src),$(builddir)/$(dir $(call b
 $(foreach src_file,$(directories), $(eval $(call create_test_dir_template,$(src_file))))
 $(foreach src_file,$(tests_src),$(eval $(call create_test_template,$(src_file))))
 
+-include $(builddir)/vis.d
+$(builddir)/vis.wasm: vis/machine.cpp makefile | $(builddir)
+	$(CLANG_UNWRAP) -MMD -std=gnu++26 --target=wasm32 -nostdlib -O3 -Wl,--no-entry -Wl,--export-all -Wl,--import-undefined -fno-rtti -fno-exceptions -I. -o $@ vis/machine.cpp
+$(builddir)/vis-network.min.js: vis/vis-network.min.js
+	cp -t $(builddir) vis/vis-network.min.js
+$(builddir)/vis/index.html: vis/index.html
+	cp -t $(builddir) vis/index.html
+
+vis_build: $(builddir)/vis.wasm $(builddir)/vis-network.min.js $(builddir)/index.html
+vb: vis_build
+vis: vis_build
+	cd $(builddir) && http-server -c1

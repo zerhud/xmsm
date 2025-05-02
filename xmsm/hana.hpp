@@ -8,17 +8,36 @@
  * or <http://www.gnu.org/licenses/> for details
  *************************************************************************/
 
-#include <utility>
-
 #include "hash.hpp"
 
 namespace xmsm {
+
+namespace details {
+template<typename t> constexpr decltype(auto) move(t&v) {return (t&&)v;}
+template<typename _Tp, typename _Up = _Tp&&> _Up __declval(int);
+template<typename _Tp> _Tp __declval(long);
+template<typename _Tp> auto declval() noexcept -> decltype(__declval<_Tp>(0));
+template <typename T> struct decay { template <typename U> static U impl(U); using type = decltype(impl(declval<T>())); };
+template<typename, auto...> struct shim_for_clang_stupidity{};
+}
+template<auto val> constexpr decltype(auto) with_inds(auto&& fnc, auto&&...args) {
+#if __has_builtin(__integer_pack)
+  return fnc.template operator()<__integer_pack(val)...>(static_cast<decltype(args)&&>(args)...);
+#else
+  return [&]<typename shim, auto...inds>(details::shim_for_clang_stupidity<shim, inds...>){
+    return fnc.template operator()<inds...>(static_cast<decltype(args)&&>(args)...);
+  }(__make_integer_seq<details::shim_for_clang_stupidity, int, val>{});
+#endif
+}
+
 template<auto v> struct _value{ constexpr static auto val = v; };
 template<auto v> constexpr auto value_c = _value<v>{};
+template<auto...> struct value_list{};
+template<auto...v> constexpr auto size(value_list<v...>) { return sizeof...(v);}
 template<typename t> struct _type_c{ using type = t; t operator+() const ; constexpr t operator()()const{return t{};} constexpr operator bool()const{return __is_same(type, void);}};
 template<typename t> constexpr t operator*(const _type_c<t>&){ return t{}; }
 template<typename t=void> constexpr auto type_c = _type_c<t>{};
-template<typename t=void> constexpr auto type_dc = _type_c<std::decay_t<t>>{};
+template<typename t=void> constexpr auto type_dc = _type_c<typename details::decay<t>::type>{};
 template<typename l, typename r> constexpr bool operator==(_type_c<l>, _type_c<r>) { return false; }
 template<typename c> constexpr bool operator==(_type_c<c>, _type_c<c>) { return true; }
 template<typename l, typename r> constexpr bool operator<=(_type_c<l> ll, _type_c<r> rr) { return __is_base_of(l, r); }
@@ -50,9 +69,7 @@ template<typename... left, typename... right> constexpr auto operator<<(const ty
 template<typename... items> constexpr auto revert(const type_list<items...>&) {return (type_list{} % ... % type_c<items>);}
 template<typename... items> constexpr auto unpack(const type_list<items...>&, auto&& fnc) { return fnc(type_c<items>...); }
 template<typename... items> constexpr auto unpack_with_inds(const type_list<items...>&, auto&& fnc) {
-  return [&]<auto...inds>(std::index_sequence<inds...>){
-    return fnc.template operator()<inds...>(type_c<items>...);
-  }(std::make_index_sequence<sizeof...(items)>{});
+  return with_inds<sizeof...(items)>(static_cast<decltype(fnc)&&>(fnc), type_c<items>...);
 }
 template<typename... items> constexpr bool foreach(const type_list<items...>&, auto&& fnc) {
   return (false || ... || fnc(type_c<items>));
@@ -92,7 +109,7 @@ consteval auto max_min_size(auto&&... lists) {
   return ret;
 }
 consteval auto max_size(auto&&... lists) {
-  auto [max,min] = max_min_size(std::forward<decltype(lists)>(lists)...);
+  auto [max,min] = max_min_size(static_cast<decltype(lists)&&>(lists)...);
   return max;
 }
 
@@ -139,6 +156,7 @@ template<typename type, auto ind> struct tuple_value {
   template<typename object, template<typename...>class holder, typename factory, typename... tail, auto _ind>
   constexpr friend type& get(tuple_value<holder<factory, object, tail...>, _ind>& t) requires (type_c<type> == type_c<holder<factory,object,tail...>>) { return t.value; }
 };
+
 template<typename... bases> struct tuple_storage : bases... {
   using bases::g...;
   constexpr decltype(sizeof...(bases)) size() const { return sizeof...(bases); }
@@ -153,25 +171,27 @@ template<typename... bases> struct tuple_storage : bases... {
 #endif
 };
 constexpr auto mk_tuple(auto&&... items) {
-  return [&]<auto... inds>(std::index_sequence<inds...>){
-    return tuple_storage<tuple_value<std::decay_t<decltype(items)>, inds>...>{std::forward<decltype(items)>(items)...};
-  }(std::make_index_sequence<sizeof...(items)>{});
+  return with_inds<sizeof...(items)>([&]<auto... inds>{
+    return tuple_storage<tuple_value<decltype(+type_dc<decltype(items)>), inds>...>{static_cast<decltype(items)&&>(items)...};
+  });
 }
 
 constexpr auto size(const auto& obj) requires requires{obj.size();} { return obj.size(); }
 constexpr auto foreach(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
-  return [&]<auto...inds>(std::index_sequence<inds...>){ return (false||...||fnc(get<inds>(obj))); }(std::make_index_sequence<size(obj)>{});
+  //return with_inds<size(obj)>([&]<auto...inds>{ return (false||...||fnc(get<inds>(obj))); });
+  return with_inds<size(obj)>([&]<auto...inds>{ return (false||...||fnc(obj.template g<inds>())); });
 }
 constexpr auto unpack(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
-  return [&]<auto...inds>(std::index_sequence<inds...>){ return fnc(get<inds>(obj)...); }(std::make_index_sequence<size(obj)>{});
+  //return with_inds<size(obj)>([&]<auto...inds>{ return fnc(get<inds>(obj)...); });
+  return with_inds<size(obj)>([&]<auto...inds>{ return fnc(obj.template g<inds>()...); });
 }
 constexpr auto unpack(auto&& obj, auto&& filter, auto&& fnc) {
-  constexpr auto inds = [&]<auto...inds>(std::index_sequence<inds...>){
+  constexpr auto inds = with_inds<size(obj)>([&]<auto...inds>{
     return (type_list{} << ... << [&]<auto cur>(_value<cur>) {
       if constexpr(filter(get<cur>(obj))) return type_c<_value<cur>>;
       else return type_c<>;
     }(value_c<inds>));
-  }(std::make_index_sequence<size(obj)>{});
+  });
   return unpack(inds, [&](auto... inds) {
     return fnc(get<decltype(+inds)::val>(obj)...);
   });

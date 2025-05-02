@@ -83,8 +83,8 @@ template<typename c> struct not_checker : basic {
   constexpr static auto list_scenarios() { return type_list{} << c::list_scenarios(); }
 };
 
-constexpr auto operator!(auto&& c){ return not_checker<std::decay_t<decltype(c)>>{}; }
-constexpr auto operator||(auto&& l, auto&& r){ return or_checker<std::decay_t<decltype(l)>, std::decay_t<decltype(r)>>{}; }
-constexpr auto operator&&(auto&& l, auto&& r){ return and_checker<std::decay_t<decltype(l)>, std::decay_t<decltype(r)>>{}; }
+constexpr auto operator!(auto&& c){ return not_checker<decltype(+type_dc<decltype(c)>)>{}; }
+constexpr auto operator||(auto&& l, auto&& r){ return or_checker<decltype(+type_dc<decltype(l)>), decltype(+type_dc<decltype(r)>)>{}; }
+constexpr auto operator&&(auto&& l, auto&& r){ return and_checker<decltype(+type_dc<decltype(l)>), decltype(+type_dc<decltype(r)>)>{}; }
 
 }

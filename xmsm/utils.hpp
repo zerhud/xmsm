@@ -64,15 +64,15 @@ template<typename scenario> constexpr auto& search_scenario(_type_c<scenario>, a
 #endif
 }
 template<auto ind, auto cur> constexpr decltype(auto) _nth(auto&& first, auto&&... tail) {
-  if constexpr(ind==cur) return std::forward<decltype(first)>(first);
-  else return _nth<ind,cur+1>(std::forward<decltype(tail)>(tail)...);
+  if constexpr(ind==cur) return static_cast<decltype(first)&&>(first);
+  else return _nth<ind,cur+1>(static_cast<decltype(tail)&&>(tail)...);
 }
 template<auto ind> constexpr decltype(auto) nth(auto&&... args) {
   //TODO: GCC15: delete the function
 #if defined(__cpp_pack_indexing)
-  return std::forward<decltype(args...[ind])>(args...[ind]);
+  return static_cast<decltype(args...[ind])&&>(args...[ind]);
 #else
-  return _nth<ind, 0>(std::forward<decltype(args)>(args)...);
+  return _nth<ind, 0>(static_cast<decltype(args)&&>(args)...);
 #endif
 }
 

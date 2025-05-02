@@ -24,8 +24,8 @@ template<typename factory, typename object, typename user_type> constexpr auto m
 template<typename factory, typename object, typename user_type=object>
 struct scenario : decltype(+mk_scenario_base_type<factory, object, user_type>()) {
   using base = decltype(+mk_scenario_base_type<factory, object, user_type>());
-  constexpr explicit scenario(factory f) : base(std::move(f)) {}
-  constexpr explicit scenario(factory f, user_type uo) : base(std::move(f), std::move(uo)) {}
+  constexpr explicit scenario(factory f) : base(details::move(f)) {}
+  constexpr explicit scenario(factory f, user_type uo) : base(details::move(f), details::move(uo)) {}
   template<typename scenario, typename state> constexpr bool in_state_by_scenario() const {
     if constexpr(type_c<object> <= type_c<scenario>) {
       if constexpr(base::is_multi()) return base::count() == base::template count_in<state>();

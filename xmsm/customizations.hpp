@@ -24,21 +24,21 @@ template<typename type> constexpr auto& variant_emplace(const auto& f, auto& v, 
 }
 
 constexpr auto& xmsm_emplace_back(auto& obj, auto&&... v) {
-  if constexpr(requires{emplace_back(obj, std::forward<decltype(v)>(v)...);}) return emplace_back(obj, std::forward<decltype(v)>(v)...);
-  else if constexpr(requires{obj.emplace_back(std::forward<decltype(v)>(v)...);}) return obj.emplace_back(std::forward<decltype(v)>(v)...);
-  else return obj.push_back(std::forward<decltype(v)>(v)...);
+  if constexpr(requires{emplace_back(obj, static_cast<decltype(v)&&>(v)...);}) return emplace_back(obj, static_cast<decltype(v)&&>(v)...);
+  else if constexpr(requires{obj.emplace_back(static_cast<decltype(v)&&>(v)...);}) return obj.emplace_back(static_cast<decltype(v)&&>(v)...);
+  else return obj.push_back(static_cast<decltype(v)&&>(v)...);
 }
 constexpr void pop_back(auto& obj) {
   obj.pop_back();
 }
 
 constexpr auto& xmsm_insert_or_emplace(auto& obj, auto&& key, auto&& val) {
-  if constexpr(requires{obj.insert_or_assign(key, std::forward<decltype(val)>(val));}) {
-    auto [iter, _] = obj.insert_or_assign(std::forward<decltype(key)>(key), std::forward<decltype(val)>(val));
+  if constexpr(requires{obj.insert_or_assign(key, static_cast<decltype(val)&&>(val));}) {
+    auto [iter, _] = obj.insert_or_assign(static_cast<decltype(key)&&>(key), static_cast<decltype(val)&&>(val));
     return *iter;
   }
   else {
-    return xmsm_emplace_back(obj, std::forward<decltype(key)>(key), std::forward<decltype(val)>(val));
+    return xmsm_emplace_back(obj, static_cast<decltype(key)&&>(key), static_cast<decltype(val)&&>(val));
   }
 }
 
@@ -111,7 +111,7 @@ constexpr auto xmsm_find_pointer(const auto& f, auto& con, const auto& key) {
   }
 }
 constexpr void xmsm_erase_if(const auto& f, auto& con, auto&& fnc) {
-  if constexpr(requires{erase_if(f, con, std::forward<decltype(fnc)>(fnc));}) erase_if(f, con, std::forward<decltype(fnc)>(fnc));
+  if constexpr(requires{erase_if(f, con, static_cast<decltype(fnc)&&>(fnc));}) erase_if(f, con, static_cast<decltype(fnc)&&>(fnc));
   else {
     static_assert( requires{con[0];}, "try to provide erase_if method for this container");
     for (auto i=0;i<con.size();++i) if (fnc(con[i])) erase(f, con, i--);
@@ -120,9 +120,11 @@ constexpr void xmsm_erase_if(const auto& f, auto& con, auto&& fnc) {
 
 template<typename scenario, typename transaction, typename next> constexpr void call_with_try_catch(const auto& f, auto&& fnc) {
   if constexpr(!requires{on_exception<scenario, transaction, next>(f);}) fnc();
+#ifdef __EXCEPTIONS //TODO: remove it when fix https://github.com/llvm/llvm-project/issues/138939 (needed for compile visualizator)
   else {
     try{fnc();} catch (...){on_exception<scenario, transaction, next>(f);}
   }
+#endif
 }
 
 template<auto at_least, auto cmd> constexpr bool call_if_need_not_enough_data(const auto& f, auto* buf, auto sz) {

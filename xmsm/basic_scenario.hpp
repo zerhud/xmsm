@@ -53,8 +53,9 @@ template<typename factory, typename object> struct basic_scenario {
   factory f;
 
   constexpr static auto own_hash() { return hash(type_c<object>); }
+  constexpr static auto own_name() { return name<factory>(type_c<object>); }
 
-  constexpr explicit basic_scenario(factory f) : f(std::move(f)) {}
+  constexpr explicit basic_scenario(factory f) : f(details::move(f)) {}
 
   friend constexpr auto mk_sm_description(const basic_scenario&, auto&&... args) {
     return type_list<decltype(+type_dc<decltype(args)>)...>{};
@@ -68,7 +69,7 @@ template<typename factory, typename object> struct basic_scenario {
     return unpack(mods_list, [](auto... s){return trans_info<from, to, event, decltype(+s)..., mods...>{};});
   }
   template<typename from, typename to, typename event=void, typename... mods>
-  friend constexpr auto mk_qtrans(const basic_scenario& s, auto&&... mods_obj) { return mk_trans<from, to, event, mods...>(s, modificators::allow_queue{}, std::forward<decltype(mods_obj)>(mods_obj)...); }
+  friend constexpr auto mk_qtrans(const basic_scenario& s, auto&&... mods_obj) { return mk_trans<from, to, event, mods...>(s, modificators::allow_queue{}, static_cast<decltype(mods_obj)&&>(mods_obj)...); }
   template<typename st> friend constexpr auto pick_def_state(const basic_scenario&) { return modificators::def_state<st>{}; }
   template<typename... e> friend constexpr auto stack_by_event(const basic_scenario&) { return modificators::stack_by_event<e...>{}; }
   friend constexpr auto _true(const basic_scenario&){ return scenario_checker::_true{}; }
@@ -94,7 +95,7 @@ template<typename factory, typename object> struct basic_scenario {
   template<typename type> friend constexpr auto mk_change(const basic_scenario&) { return type_c<type>; }
   friend constexpr auto nothing(const basic_scenario&) { return type_c<>; }
 
-  using info = decltype(object::describe_sm(std::declval<basic_scenario>()));
+  using info = decltype(object::describe_sm(details::declval<basic_scenario>()));
 
   constexpr static bool is_multi() { return first(info{}) == type_c<multi_sm_indicator>; }
   constexpr static bool is_finish_state(auto st) { return unpack(info{}, [](auto... i){return (0+...+[](auto i) {

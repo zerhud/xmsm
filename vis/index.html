@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vis.js Graph Example</title>
+    <script src="vis-network.min.js"></script>
+    <style>
+        body { margin: 0; }
+        #network { width: 100%; height: 100vh; border: 1px solid #ccc; }
+        .vis-tooltip { position: absolute; }
+    </style>
+</head>
+<body>
+    <div id="network"></div>
+    <script type="module">
+      function preTitle(text) {
+        const container = document.createElement("pre");
+        container.innerHTML = text;
+        return container;
+      }
+
+      function gen_color() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+
+      // Импортируем данные графа
+      //import { nodes, edges } from './data.js';
+      function jsCallback(value) {
+        console.log(`Received value from C++: ${value}`);
+      }
+
+        // Загружаем и инстанцируем WASM-модуль
+      WebAssembly.instantiateStreaming(fetch('vis.wasm'), {
+        env: { js_callback: jsCallback }
+      }).then(({ instance }) => {
+        // Вызываем экспортированную функцию из C++
+        instance.exports.main_function();
+
+        let nodes_ds = [];
+        let edges_ds = [];
+        let groups_ds = {};
+
+        // Настраиваем контейнер и данные
+        for(let i=0;i<instance.exports.all_vertexes_size();++i) {
+          let l = new Uint8Array(instance.exports.memory.buffer, instance.exports.all_vertexes_name(i), instance.exports. all_vertexes_name_sz(i));
+          if (!instance.exports.all_vertexes_is_event(i)) nodes_ds.push({
+            id: instance.exports.all_vertexes_hash(i).toString(),
+            group: instance.exports.all_vertexes_group(i).toString(),
+            label: new TextDecoder().decode(l),
+            title: preTitle(instance.exports.all_vertexes_hash(i).toString())
+          });
+          else nodes_ds.push({
+            id: instance.exports.all_vertexes_hash(i).toString(),
+            group: instance.exports.all_vertexes_group(i).toString(),
+            label: 'e',
+            title: preTitle(new TextDecoder().decode(l) + ', ' + instance.exports.all_vertexes_hash(i).toString()),
+            shape: 'circle', color: 'red'
+          });
+        }
+        for(let i=0;i<instance.exports.all_edges_size();++i) {
+          let l = new Uint8Array(instance.exports.memory.buffer, instance.exports.all_edges_event_name(i), instance.exports.all_edges_event_name_sz(i));
+          let cur = instance.exports.all_edges_hash(i).toString();
+          nodes_ds.push({ id: cur, group: instance.exports.all_edges_group(i).toString(), opacity:0.8, color:'black' });
+          edges_ds.push({from:instance.exports.all_edges_from(i).toString(), to:cur});
+          edges_ds.push({from:cur, to:instance.exports.all_edges_to(i).toString()});
+          edges_ds.push({from:instance.exports.all_edges_event(i).toString(), to:cur, dashes:true});
+
+          let move_to = new BigUint64Array(instance.exports.memory.buffer, instance.exports.all_edges_move_to(i), instance.exports.all_edges_move_to_sz(i));
+          move_to.forEach( (obj) => {
+            edges_ds.push({from: cur, to:obj.toString(), dashes:true, color:{color:'gray', opacity:0.3}});
+          } );
+        }
+        for(let i=0;i<instance.exports.all_groups_size();++i) {
+          groups_ds[instance.exports.all_groups_hash(i).toString()] = {color:gen_color()};
+        }
+        console.log("finally " , nodes_ds, edges_ds);
+        const container = document.getElementById("network");
+        const data = { nodes: new vis.DataSet(nodes_ds), edges: new vis.DataSet(edges_ds) };
+        const options = {
+          nodes: {
+            //shape: "dot",
+            size: 20,
+            font: { size: 14 }
+          },
+          edges: {
+            width: 2,
+            color: "#333",
+            arrows: "to",
+            hoverWidth: function (width) {return width+2;}
+          },
+          physics: {
+            enabled: true,
+            solver: "forceAtlas2Based"
+          },
+          interaction: {
+            dragNodes: true,
+            zoomView: true
+          },
+          groups: groups_ds
+        };
+
+        // Инициализируем сеть
+        const network = new vis.Network(container, data, options);
+      }).catch(err => console.error('Error:', err));
+    </script>
+</body>
+</html>

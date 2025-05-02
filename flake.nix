@@ -18,7 +18,11 @@
         name = "xmsm";
         NIX_ENFORCE_NO_NATIVE = false;
         buildInputs = with pkgs;[ ];
-        nativeBuildInputs = with pkgs;[ gnumake gdb clang_20 boost186 ];
+        nativeBuildInputs = with pkgs;[
+          gnumake gdb clang_20
+          boost186
+          llvmPackages_20.lld nodejs_22 nodePackages.http-server
+        ];
         installPhase = "mkdir -p \"$out/include\" ";
         buildPhase = "make";
         meta.description = "extended sate machied. it suppurs linking beween few machines.";

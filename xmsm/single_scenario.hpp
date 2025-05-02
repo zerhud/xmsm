@@ -38,8 +38,8 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr static bool is_mod_when_requires() { return unpack(all_trans_info(), [](auto... i){return (0 + ... + (decltype(+i)::mod_when!=type_c<>)); }); }
   constexpr static auto mk_states_type(const auto& f) {
     return unpack(all_states(), [&]([[maybe_unused]] auto... states) {
-      static_assert( size(all_states()) == size(((type_list{}<<base::initial_state())<<...<<decltype(std::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
-      return mk_variant< decltype(+std::declval<base>().ch_type(states))... >(f);
+      static_assert( size(all_states()) == size(((type_list{}<<base::initial_state())<<...<<decltype(details::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
+      return mk_variant< decltype(+details::declval<base>().ch_type(states))... >(f);
     });
   }
   constexpr static auto mk_stack_type(const auto& f) {
@@ -51,7 +51,7 @@ struct single_scenario : basic_scenario<factory, object> {
       }(info));});
       constexpr auto expr_variant_type = unpack(list_of_expressions, [](auto&&... expr) {
         if constexpr (sizeof...(expr)==0) return type_c<int>;
-        else return type_c<decltype(mk_variant< decltype(+expr)... >(std::declval<factory>()))>;
+        else return type_c<decltype(mk_variant< decltype(+expr)... >(details::declval<factory>()))>;
       });
       constexpr auto list_of_lists_back_events = unpack(all_trans_info(), [](auto&&... info){return (type_list{} + ... + type_c<decltype([](auto i) {
         if constexpr(decltype(+i)::mod_stack_by_event==type_c<>) return type_list{};
@@ -62,14 +62,14 @@ struct single_scenario : basic_scenario<factory, object> {
   }
 
   user_type obj;
-  decltype(mk_states_type(std::declval<factory>())) state;
-  [[no_unique_address]] decltype(mk_stack_type(std::declval<factory>())) stack;
+  decltype(mk_states_type(details::declval<factory>())) state;
+  [[no_unique_address]] decltype(mk_stack_type(details::declval<factory>())) stack;
   scenario_state _own_state : 7 {scenario_state::ready};
   bool synced  : 1 {true};
   [[no_unique_address]] decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
 
-  constexpr explicit single_scenario(factory f) : single_scenario(std::move(f), user_type{}) {}
-  constexpr explicit single_scenario(factory f, user_type uo) : base(std::move(f)), obj(std::move(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
+  constexpr explicit single_scenario(factory f) : single_scenario((factory&&)(f), user_type{}) {}
+  constexpr explicit single_scenario(factory f, user_type uo) : base((factory&&)(f)), obj((user_type&&)(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
 
   constexpr bool is_synced() const {return synced;}
   constexpr scenario_state own_state() const { return this->_own_state; }
@@ -127,7 +127,7 @@ struct single_scenario : basic_scenario<factory, object> {
     });
   }
   template<typename... target> constexpr bool move_to_or_wait(const auto& e, auto&&... scenarios) {
-    return move_to_or_wait_cond(e, [](auto to)->bool{return (0+...+(type_c<target> == to));}, std::forward<decltype(scenarios)>(scenarios)...);
+    return move_to_or_wait_cond(e, [](auto to)->bool{return (0+...+(type_c<target> == to));}, static_cast<decltype(scenarios)&&>(scenarios)...);
   }
   constexpr bool move_to_or_wait_cond(const auto& e, auto&& fnc, auto&&...scenarios) {
     return base::transactions_for_move_to(cur_state_hash(), fnc, [&](auto t) {
@@ -194,7 +194,7 @@ private:
     });
   }
   constexpr auto clean_stack_by_expr(const auto& e, auto&&... scenarios) {
-    auto check = [&](auto e) { return visit([&](auto expr){return expr(std::forward<decltype(scenarios)>(scenarios)...);}, e); };
+    auto check = [&](auto e) { return visit([&](auto expr){return expr(static_cast<decltype(scenarios)&&>(scenarios)...);}, e); };
     pop_stack(e, [&](auto& frame){return check(frame.back_expression);});
   }
   constexpr auto clean_stack(const auto& e) /* pre(contains(all_events(), type_dc<decltype(e)>)) */ {
@@ -208,7 +208,7 @@ private:
     constexpr bool is_stack_required = tinfo.mod_stack_by_event==type_c<> && tinfo.mod_stack_by_expression==type_c<>;
     if constexpr (is_stack_required) return variant_emplace<next_type>(this->f, cur_state(), next);
     else {
-      auto& ret = xmsm_emplace_back(stack, std::move(next));
+      auto& ret = xmsm_emplace_back(stack, details::move(next));
       if constexpr(tinfo.mod_stack_by_event!=type_c<>) unpack(decltype(+tinfo.mod_stack_by_event)::back_events, [&](auto... events) {
         auto ind=-1;
         (void)( true && ... && (ret.back_event_non_zero_ids[++ind]=hash(find(all_events(), events)),true));

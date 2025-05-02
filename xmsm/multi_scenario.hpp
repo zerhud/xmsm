@@ -13,7 +13,7 @@
 namespace xmsm {
 
 template<typename factory> struct scenario_id_def_generator {
-  using id_type = decltype(mk_atomic<uint64_t>(std::declval<factory>()));
+  using id_type = decltype(mk_atomic<uint64_t>(details::declval<factory>()));
   id_type last_id{};
   constexpr auto operator()(const auto&){ return ++last_id; }
 };
@@ -55,10 +55,10 @@ struct multi_scenario : basic_scenario<factory, object> {
     else return mk_list<entry_type>(f);
   }
 
-  constexpr explicit multi_scenario(factory f) : base(std::move(f)), user_id_gen(mk_user_id_generator(this->f)), scenarios(mk_scenarios_type(this->f)) {}
+  constexpr explicit multi_scenario(factory f) : base(details::move(f)), user_id_gen(mk_user_id_generator(this->f)), scenarios(mk_scenarios_type(this->f)) {}
 
-  decltype(mk_user_id_generator(std::declval<factory>())) user_id_gen;
-  decltype(mk_scenarios_type(std::declval<factory>())) scenarios;
+  decltype(mk_user_id_generator(details::declval<factory>())) user_id_gen;
+  decltype(mk_scenarios_type(details::declval<factory>())) scenarios;
 
   constexpr auto count() const { return scenarios.size(); }
   template<typename... st> constexpr auto count_in() const { auto ret = 0; foreach_scenario([&](const auto& s){ret+=(0+...+in_state<st>(s));}); return ret; }
@@ -111,7 +111,7 @@ struct multi_scenario : basic_scenario<factory, object> {
   }
   template<typename... targets> constexpr bool move_to_or_wait_cond(const auto& e, auto&& fnc, auto&&... scenarios) {
     bool ret = true;
-    foreach_scenario([&](auto& s){ret &= s.template move_to_or_wait_cond<targets...>(e, std::forward<decltype(fnc)>(fnc), scenarios...);});
+    foreach_scenario([&](auto& s){ret &= s.template move_to_or_wait_cond<targets...>(e, static_cast<decltype(fnc)&&>(fnc), scenarios...);});
     clean_scenarios();
     return ret;
   }
@@ -122,7 +122,7 @@ struct multi_scenario : basic_scenario<factory, object> {
     return ret;
   }
   constexpr auto cur_state_hash() const {
-    using hash_type = decltype(std::declval<single_scenario_type>().cur_state_hash());
+    using hash_type = decltype(details::declval<single_scenario_type>().cur_state_hash());
     hash_type ret{};
     if (!empty()) {
       auto&[_,first_scenario] = *begin(scenarios);

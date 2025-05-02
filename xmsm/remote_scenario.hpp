@@ -17,7 +17,7 @@ struct fake_multi_container {
 };
 template<typename factory> struct multi_scenario_info {
   using sz_type = decltype(sizeof(factory));
-  decltype(mk_vec<sz_type>(std::declval<factory>())) states;
+  decltype(mk_vec<sz_type>(details::declval<factory>())) states;
   constexpr auto count() const { return states.size(); }
 };
 
@@ -34,7 +34,7 @@ template<typename factory, typename object, typename connector> struct remote_sc
 
   connector* con=nullptr;
 
-  constexpr explicit remote_scenario(factory f) : base(std::move(f)), cur_state(hash(base::initial_state())), multi_container(mk_multi_container(this->f)) {}
+  constexpr explicit remote_scenario(factory f) : base(details::move(f)), cur_state(hash(base::initial_state())), multi_container(mk_multi_container(this->f)) {}
   constexpr void reset_own_state() { _own_state = scenario_state::ready; }
   constexpr static void on_other_scenarios_changed(auto&&...) {}
   constexpr static void on(auto&&...) {}
@@ -93,7 +93,7 @@ private:
   hash_type cur_state{};
   unsigned cur_state_index{};
   scenario_state _own_state {scenario_state::ready};
-  [[no_unique_address]] decltype(mk_multi_container(std::declval<factory>())) multi_container;
+  [[no_unique_address]] decltype(mk_multi_container(details::declval<factory>())) multi_container;
 };
 
 }

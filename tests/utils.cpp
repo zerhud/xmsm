@@ -21,6 +21,15 @@ static_assert( name<tests::factory>(xmsm::type_c<foo>) == "foo"sv );
 static_assert( name<tests::factory>(xmsm::type_c<test::t::t::bar<3>>) == "test::t::t::bar<3>"sv );
 static_assert( hash(xmsm::type_c<foo>) == 2414502773, "the murmurhash value calculated in external tool is matched with xmsm::hash" );
 
+static_assert( xmsm::with_inds<3>([]<auto...inds>{return (0+...+inds);}) == 3 );
+static_assert( [] { auto tup = xmsm::mk_tuple(3,0.3); return get<0>(tup); }() == 3 );
+static_assert( xmsm::type_dc<int&> == xmsm::type_c<int> );
+static_assert( xmsm::type_dc<int&&> == xmsm::type_c<int> );
+static_assert( xmsm::type_dc<const int&> == xmsm::type_c<int> );
+static_assert( xmsm::type_dc<const int*> == xmsm::type_c<const int*> );
+static_assert( xmsm::type_dc<int[2]> == xmsm::type_c<int*> );
+static_assert( xmsm::type_dc<int(int)> == xmsm::type_c<int(*)(int)> );
+
 static_assert( xmsm::type_c<foo> == xmsm::type_c<foo> );
 static_assert( xmsm::type_c<int> != xmsm::type_c<foo> );
 static_assert( xmsm::type_c<decltype(xmsm::type_list{} << xmsm::type_c<int> << xmsm::type_c<>)> == xmsm::type_c<xmsm::type_list<int>> );
@@ -57,4 +66,10 @@ int main(int,char**){
     if (ct_hash!=rt_hash) throw std::runtime_error(std::to_string(__LINE__));
   }
   std::cout << "hash64(foo) == |" << hash64(xmsm::type_c<foo>) << '|' << std::endl;
+  constexpr auto is_little = [] {
+    constexpr char m[] = {0x00, 0x01, 0x02, 0x03};
+    return (uint32_t)(m[0] + (m[1]<<8) + (m[2]<<16) + (m[3]<<24)) == 0x00010203;
+  };
+  constexpr char m[] = {0x00, 0x01, 0x02, 0x03};
+  std::cout << is_little() << ' ' << std::hex << (uint32_t)(m[0] + (m[1]<<8) + (m[2]<<16) + (m[3]<<24)) << std::endl;
 }

@@ -53,34 +53,32 @@ struct state_queue_tracker {
 
   template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker* search()
   requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
-  constexpr bool deactivate() {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]=-1)+...);}(std::make_index_sequence<size(list{})>{});}
-  constexpr bool is_active() const {return [this]<auto...inds>(std::index_sequence<inds...>){return ((indexes[inds]>=0)+...);}(std::make_index_sequence<size(list{})>{});}
+  constexpr bool deactivate() {return with_inds<size(list{})>([this]<auto...inds>{return ((indexes[inds]=-1)+...);});}
+  constexpr bool is_active() const {return with_inds<size(list{})>([this]<auto...inds>{return ((indexes[inds]>=0)+...);});}
 
   constexpr static auto get_state(auto st_list, auto ind) {
-    return [&]<auto...inds>(std::index_sequence<inds...>){
-      return (0+...+((inds==ind)*hash(get<inds>(st_list))));
-    }(std::make_index_sequence<size(st_list)>{});
+    return with_inds<size(st_list)>([&]<auto...inds>{ return (0+...+((inds==ind)*hash(get<inds>(st_list)))); });
   }
   constexpr void activate(auto cur_hash) {
     if (is_active()) return;
     if (cur_hash==hash(last(first(list{})()))) return;
-    [&]<auto...inds>(std::index_sequence<inds...>){
+    with_inds<size(list{})>([&]<auto...inds>{
       (void) (0 + ... + [&](auto ind, auto st_list) {
         return indexes[ind] = index_of_by_hash(st_list(), cur_hash);
       }(inds, get<inds>(list{})));
-    }(std::make_index_sequence<size(list{})>{});
+    });
   }
   constexpr bool check_and_shift_state(auto cur_hash) {
     if (!is_active()) return true;
     if (cur_hash==hash(last(first(list{})()))) {deactivate(); return true;}
-    return [&]<auto...inds>(std::index_sequence<inds...>){
+    return with_inds<size(list{})>([&]<auto...inds>{
       return (0 + ... + [&](auto ind, auto st_list) {
         if (indexes[ind]<0) return false;
         const bool is_next_state = get_state(st_list(), indexes[ind]+1)==cur_hash;
         indexes[ind] += is_next_state;
         return is_next_state || get_state(st_list(), indexes[ind])==cur_hash ;
       }(inds, get<inds>(list{})));
-    }(std::make_index_sequence<size(list{})>{});
+    });
   }
   constexpr void update(auto* cur_scenario, const auto& e, auto&&... others) {
     static_assert( !basic_scenario<factory, scenario>::is_multi() );
@@ -119,18 +117,18 @@ struct state_queue_tracker_multi {
     }
     constexpr static auto count_to_end(auto h, auto _st_list) {
       auto st_list = revert(_st_list);
-      return [&]<auto... inds>(std::index_sequence<inds...>){
+      return with_inds<size(st_list)>([&]<auto... inds>{
         return (0+...+( inds*(hash(get<inds>(st_list))==h) ));
-      }(std::make_index_sequence<size(st_list)>{});
+      });
     }
     constexpr static auto scenario_maximum(auto cur_hash) {
       auto cur_max = 0;
-      [&]<auto... inds>(std::index_sequence<inds...>){
+      with_inds<size(list{})>([&]<auto... inds>{
         ([&](auto ind, auto st_list) {
           auto cur = count_to_end(cur_hash, st_list());
           cur_max = cur*(cur_max<cur);
         }(inds, get<inds>(list{})), ...);
-      }(std::make_index_sequence<size(list{})>{});
+      });
       return cur_max;
     }
     constexpr void calculate(const auto& s) {

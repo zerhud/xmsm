@@ -17,7 +17,7 @@ namespace xmsm {
 template<typename factory, typename... scenarios_t>
 struct machine {
   using hash_type = decltype(hash(type_c<factory>));
-  using connector_type = decltype(distribution::mk_connector<factory, scenarios_t...>(std::declval<factory>()));
+  using connector_type = decltype(distribution::mk_connector<factory, scenarios_t...>(details::declval<factory>()));
 
   constexpr static auto mk_scenarios(const auto& f) {
     auto mk = [&](auto t){
@@ -37,18 +37,18 @@ struct machine {
   constexpr static auto place() { return hash(utils::factory_entity<factory>()); }
   constexpr static auto entity_list() { return (type_list{} << ... << basic_scenario<factory, scenarios_t>::entity_list()); }
 
-  constexpr explicit machine(factory f) : f(std::move(f)), scenarios(mk_scenarios(this->f)), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
+  constexpr explicit machine(factory f) : f(details::move(f)), scenarios(mk_scenarios(this->f)), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
     foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
   }
   constexpr machine(const machine& other) : f(other.f), scenarios(other.scenarios), connector(distribution::mk_connector<factory, scenarios_t...>(this->f)) {
     foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
   }
-  constexpr machine(machine&& other) : f(std::move(other.f)), scenarios(std::move(other.scenarios)), connector(std::move(other.connector)) {
+  constexpr machine(machine&& other) : f(details::move(other.f)), scenarios(details::move(other.scenarios)), connector(details::move(other.connector)) {
     foreach(scenarios, [this](auto& s){if constexpr(s.is_remote()) s.con = &connector;return false;});
   }
 
   factory f;
-  decltype(mk_scenarios(std::declval<factory>())) scenarios;
+  decltype(mk_scenarios(details::declval<factory>())) scenarios;
   [[no_unique_address]] connector_type connector;
 
   constexpr void try_to_repair(auto&& event) {
@@ -123,6 +123,16 @@ struct machine {
     constexpr bool e1_to_e2 = (false||...||(contains(basic_scenario<factory, scenarios_t>::entity_list(), type_c<e1>) && basic_scenario<factory, scenarios_t>::template need_sync_with_ent<e2>()));
     constexpr bool e2_to_e1 = (false||...||(contains(basic_scenario<factory, scenarios_t>::entity_list(), type_c<e2>) && basic_scenario<factory, scenarios_t>::template need_sync_with_ent<e1>()));
     return e1_to_e2 || e2_to_e1;
+  }
+
+  constexpr static auto all_scenarios() { return (type_list{} << ... << type_c<basic_scenario<factory, scenarios_t>>); }
+  constexpr static auto all_states() { return (type_list{} << ... << basic_scenario<factory, scenarios_t>::all_states()); }
+  constexpr static auto all_trans() { return (type_list{} + ... + basic_scenario<factory, scenarios_t>::all_trans_info()); }
+  constexpr static auto all_events() {
+    constexpr auto ret = (type_list{} << ... << basic_scenario<factory, scenarios_t>::all_events());
+    constexpr auto check = [](auto e){ return unpack(decltype(ret){}, [&](auto...list){return (0+...+(list<=e));}); };
+    static_assert( unpack(ret, [&](auto...e){return ((check(e)==1) + ...);}) == size(ret), "an event cannot to be derived from other event" );
+    return ret;
   }
 private:
   template<auto cmd_s, auto cmd_m> constexpr void sync(const auto& event) {
@@ -226,12 +236,6 @@ private:
   }
   constexpr void reset_states() {
     foreach(scenarios, [](auto&s){s.reset_own_state();return false;});
-  }
-  constexpr static auto all_events() {
-    constexpr auto ret = (type_list{} << ... << basic_scenario<factory, scenarios_t>::all_events());
-    constexpr auto check = [](auto e){ return unpack(decltype(ret){}, [&](auto...list){return (0+...+(list<=e));}); };
-    static_assert( unpack(ret, [&](auto...e){return ((check(e)==1) + ...);}) == size(ret), "an event cannot to be derived from other event" );
-    return ret;
   }
   template<typename type> constexpr static auto event_hash(const type&) {
     return unpack(all_events(), [](auto...list){return (0+...+(hash(list)*(list<=type_c<type>)));});
