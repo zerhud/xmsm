@@ -194,7 +194,7 @@ private:
     });
   }
   constexpr auto clean_stack_by_expr(const auto& e, auto&&... scenarios) {
-    auto check = [&](auto e) { return visit([&](auto expr){return expr(static_cast<decltype(scenarios)&&>(scenarios)...);}, e); };
+    auto check = [&](auto&& e) { return visit([&](auto&& expr){return expr(static_cast<decltype(scenarios)&&>(scenarios)...);}, e); };
     pop_stack(e, [&](auto& frame){return check(frame.back_expression);});
   }
   constexpr auto clean_stack(const auto& e) /* pre(contains(all_events(), type_dc<decltype(e)>)) */ {

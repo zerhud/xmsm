@@ -61,7 +61,7 @@ $(builddir)/vis.wasm: vis/machine.cpp makefile | $(builddir)
 	$(CLANG_UNWRAP) -MMD -std=gnu++26 --target=wasm32 -nostdlib -O3 -Wl,--no-entry -Wl,--export-all -Wl,--import-undefined -fno-rtti -fno-exceptions -I. -o $@ vis/machine.cpp
 $(builddir)/vis-network.min.js: vis/vis-network.min.js
 	cp -t $(builddir) vis/vis-network.min.js
-$(builddir)/vis/index.html: vis/index.html
+$(builddir)/index.html: vis/index.html
 	cp -t $(builddir) vis/index.html
 
 vis_build: $(builddir)/vis.wasm $(builddir)/vis-network.min.js $(builddir)/index.html

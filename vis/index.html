@@ -12,6 +12,7 @@
     </style>
 </head>
 <body>
+    <div id="events_block"></div>
     <div id="network"></div>
     <script type="module">
       function preTitle(text) {
@@ -34,10 +35,26 @@
       function jsCallback(value) {
         console.log(`Received value from C++: ${value}`);
       }
+      function on_state_changed(node_id) {
+        document.vis_data.nodes.update({
+          id: node_id.toString(),
+          color: {border:'red'},
+          borderWidth:5
+        });
+        document.active_nodes.push(node_id.toString());
+      }
+
+      function clear_states() {
+        if (document.active_nodes != null)
+          document.active_nodes.forEach( (node) => {document.vis_data.nodes.update({
+            id: node, color: null, borderWidth: null
+          });});
+        document.active_nodes = [];
+      }
 
         // Загружаем и инстанцируем WASM-модуль
       WebAssembly.instantiateStreaming(fetch('vis.wasm'), {
-        env: { js_callback: jsCallback }
+        env: { js_callback: jsCallback, change_state: on_state_changed, clear_states: clear_states }
       }).then(({ instance }) => {
         // Вызываем экспортированную функцию из C++
         instance.exports.main_function();
@@ -49,18 +66,18 @@
         // Настраиваем контейнер и данные
         for(let i=0;i<instance.exports.all_vertexes_size();++i) {
           let l = new Uint8Array(instance.exports.memory.buffer, instance.exports.all_vertexes_name(i), instance.exports. all_vertexes_name_sz(i));
-          if (!instance.exports.all_vertexes_is_event(i)) nodes_ds.push({
+          if (instance.exports.all_vertexes_is_event(i)) nodes_ds.push({
             id: instance.exports.all_vertexes_hash(i).toString(),
             group: instance.exports.all_vertexes_group(i).toString(),
-            label: new TextDecoder().decode(l),
-            title: preTitle(instance.exports.all_vertexes_hash(i).toString())
+            label: 'e', is_event: true, event_id: instance.exports.all_vertexes_event_hash(i),
+            title: preTitle(new TextDecoder().decode(l) + ', ' + instance.exports.all_vertexes_hash(i).toString()),
+            shape: 'circle', color: 'red'
           });
           else nodes_ds.push({
             id: instance.exports.all_vertexes_hash(i).toString(),
             group: instance.exports.all_vertexes_group(i).toString(),
-            label: 'e',
-            title: preTitle(new TextDecoder().decode(l) + ', ' + instance.exports.all_vertexes_hash(i).toString()),
-            shape: 'circle', color: 'red'
+            label: new TextDecoder().decode(l),
+            title: preTitle(instance.exports.all_vertexes_hash(i).toString())
           });
         }
         for(let i=0;i<instance.exports.all_edges_size();++i) {
@@ -82,6 +99,7 @@
         console.log("finally " , nodes_ds, edges_ds);
         const container = document.getElementById("network");
         const data = { nodes: new vis.DataSet(nodes_ds), edges: new vis.DataSet(edges_ds) };
+        document.vis_data = data;
         const options = {
           nodes: {
             //shape: "dot",
@@ -107,6 +125,14 @@
 
         // Инициализируем сеть
         const network = new vis.Network(container, data, options);
+        network.on('click', (props) => {
+          var ids = props.nodes;
+          var nodes = data.nodes.get(ids);
+          nodes.forEach( (node)=>{
+            if(node.is_event) instance.exports.on_event(node.event_id);
+          } );
+        })
+        instance.exports.update_states();
       }).catch(err => console.error('Error:', err));
     </script>
 </body>

@@ -29,7 +29,8 @@ constexpr auto& xmsm_emplace_back(auto& obj, auto&&... v) {
   else return obj.push_back(static_cast<decltype(v)&&>(v)...);
 }
 constexpr void pop_back(auto& obj) {
-  obj.pop_back();
+  if constexpr(requires{obj.pop_back();}) obj.pop_back();
+  else obj.pop();
 }
 
 constexpr auto& xmsm_insert_or_emplace(auto& obj, auto&& key, auto&& val) {

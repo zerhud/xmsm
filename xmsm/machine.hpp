@@ -68,6 +68,15 @@ struct machine {
     sync<sync_command::sync, sync_command::sync_multi>(event);
     connector.on_finish();
   }
+  constexpr auto on_event_by_hash(auto ehash) {
+    return foreach(all_events(), [&](auto cur_event) {
+      if (hash(cur_event)==ehash) {
+        on(create_object<decltype(+cur_event)>(this->f));
+        return true;
+      }
+      return false;
+    });
+  }
   template<auto cmd> constexpr void from_remote(const auto* buf, auto sz) {
     connector.on_start();
     if constexpr(cmd==sync_command::move_to) from_remote_move_to(buf, sz);

@@ -31,8 +31,11 @@ template<typename type, auto cop> struct static_vector {
 
   static_vector() : base((type*)dalloc(cop)) {}
 
+  constexpr bool empty() const { return sz==0; }
   constexpr type* data() {return base;}
   constexpr auto size() const { return sz; }
+  constexpr auto& back() { return base[sz-1]; }
+  constexpr const auto& back() const { return base[sz-1]; }
   constexpr type& operator[](auto ind) {return base[ind]; }
   constexpr const type& operator[](auto ind) const {return base[ind]; }
   constexpr type& emplace_back(auto&&...args) {
@@ -46,6 +49,7 @@ template<typename type, auto cop> struct static_vector {
       base[i].~type();
       if (i+1<sz) base[i] = static_cast<type&&>(base[+1]);
     }
+    --sz;
   }
 };
 
@@ -65,20 +69,35 @@ template<typename... types> struct variant {
   constexpr static auto max_size() {
     size_t max=0;
     ((max=( (sizeof(types)*(max<sizeof(types))) + (max*(sizeof(types)<=max)) ) ),...);
-    return max;
+    return max + (max%64);
   }
   size_t cur{};
   char storage[max_size()]{};
+  decltype(xmsm::mk_tuple((types*)nullptr...)) poitners;
 
   constexpr explicit variant() {
     new(&storage)types...[0]();
   }
+  constexpr variant(variant&& other) : cur(other.cur) { other.visit([&](const auto& v){ emplace<decltype(+xmsm::type_dc<decltype(v)>)>(v); }); }
+  constexpr variant(const variant& other) : cur(other.cur) { other.visit([&](auto&& v){ emplace<decltype(+xmsm::type_dc<decltype(v)>)>(static_cast<decltype(v)&&>(v)); }); }
+  constexpr variant& operator=(const variant& other) { cur = other.cur; other.visit([&](const auto& v){emplace<decltype(+xmsm::type_dc<decltype(v)>)>(v);}); return *this; }
+  constexpr variant(auto& v) {
+    constexpr auto ind = index_of(xmsm::type_list<types...>{}, xmsm::type_dc<decltype(v)>);
+    new(&storage)types...[ind](v);
+    cur = ind;
+  }
+  constexpr variant(auto&& v) {
+    constexpr auto ind = index_of(xmsm::type_list<types...>{}, xmsm::type_dc<decltype(v)>);
+    new(&storage)types...[ind](v);
+    cur = ind;
+  }
   constexpr auto index() const { return cur; }
   template<typename type> constexpr auto& emplace(auto&&... args) {
-    static_assert( ind_of<type> >= 0 );
+    static_assert( ind_of<type>() >= 0 );
     this->visit([]<typename t>(t&v){v.~t();});
     auto ret = new(&storage)type(static_cast<decltype(args)&&>(args)...);
     cur = ind_of<type>();
+    get<ind_of<type>()>(poitners) = ret;
     return *ret;
   }
   template<typename t> constexpr static auto ind_of() {
@@ -88,10 +107,27 @@ template<typename... types> struct variant {
   }
 
   template<auto cur_ind=0> constexpr auto visit(auto&& fnc) {
-    static_assert( cur_ind < sizeof...(types) );
-    if (index()==cur_ind) return fnc(static_cast<types...[cur_ind]>(*storage));
-    return visit<cur_ind+1>(static_cast<decltype(fnc)&&>(fnc));
+    if constexpr(cur_ind == sizeof...(types)-1) return fnc(*get<cur_ind>(poitners));
+    else {
+      static_assert( cur_ind < sizeof...(types) );
+      if (index()==cur_ind) return fnc(*get<cur_ind>(poitners));
+      return visit<cur_ind+1>(static_cast<decltype(fnc)&&>(fnc));
+    }
   }
+  template<auto cur_ind=0> constexpr auto visit(auto&& fnc) const {
+    if constexpr(cur_ind == sizeof...(types)-1) return fnc(*get<cur_ind>(poitners));
+    else {
+      static_assert( cur_ind < sizeof...(types) );
+      if (index()==cur_ind) return fnc(*get<cur_ind>(poitners));
+      return visit<cur_ind+1>(static_cast<decltype(fnc)&&>(fnc));
+    }
+  }
+  template<typename type> constexpr friend auto& get(variant& self) {
+    constexpr auto ind = index_of(xmsm::type_list<types...>{}, xmsm::type_dc<type>);
+    return *get<ind>(self.poitners);
+  }
+
+  constexpr friend decltype(auto) visit(auto&& fnc, variant& self) { return self.visit(static_cast<decltype(fnc)&&>(fnc)); }
 };
 }
 
@@ -105,13 +141,15 @@ template<typename type> constexpr auto mk_vec(const factory&) { return wstd::sta
 template<typename type> constexpr auto mk_list(const factory& f) { return mk_vec<type>(f); }
 template<typename type> constexpr auto mk_atomic(const factory&) { return type{}; }
 constexpr void erase(const factory&, auto& cnt, auto ind) {
-  //TODO: implement erase function
-  //cnt.erase(cnt.begin() + ind);
+  cnt.erase(ind);
 }
 
 using vis_machine = xmsm_vis::machine<factory>;
 
 extern "C" void js_callback(int);
+extern "C" void change_state(uint64_t scenario);
+extern "C" void clear_states();
+
 auto& m() {
   static vis_machine machine{factory{}};
   return machine;
@@ -125,14 +163,15 @@ auto& all_vertexes_src() {
     uint64_t hash{};
     uint32_t group{};
     wstd::string_view name{};
-    bool is_event=false;
+    uint32_t event_hash{};
   } ret[vertexes_size];
   return ret;
 }
 extern "C" uint32_t all_vertexes_size() { return vertexes_size; }
 extern "C" uint64_t all_vertexes_hash(uint32_t num) {return all_vertexes_src()[num].hash;}
 extern "C" uint32_t all_vertexes_group(uint32_t num) {return all_vertexes_src()[num].group;}
-extern "C" bool all_vertexes_is_event(uint32_t num) {return all_vertexes_src()[num].is_event;}
+extern "C" bool all_vertexes_is_event(uint32_t num) {return all_vertexes_src()[num].event_hash!=0;}
+extern "C" uint32_t all_vertexes_event_hash(uint32_t num) {return all_vertexes_src()[num].event_hash;}
 extern "C" const char* all_vertexes_name(uint32_t num) {return all_vertexes_src()[num].name.base;}
 extern "C" uint32_t all_vertexes_name_sz(uint32_t num) {return all_vertexes_src()[num].name.sz;}
 
@@ -174,6 +213,18 @@ extern "C" uint32_t all_groups_hash(uint32_t num){ return all_groups_src()[num].
 extern "C" const char* all_groups_name(uint32_t num){ return all_groups_src()[num].name.base; }
 extern "C" uint32_t all_groups_name_sz(uint32_t num){ return all_groups_src()[num].name.sz; }
 
+extern "C" void update_states() {
+  foreach(m().scenarios, [](auto& s) {
+    change_state(((uint64_t)s.own_hash() << 32) + (uint64_t)s.cur_state_hash());
+    return false;
+  });
+}
+extern "C" void on_event(uint32_t hash) {
+  clear_states();
+  m().on_event_by_hash(hash);
+  update_states();
+}
+
 extern "C" void main_function() {
   unpack(vis_machine::all_scenarios(), [](auto...s) {
     auto i=-1; (void)( [&] { ++i;
@@ -207,7 +258,7 @@ extern "C" void main_function() {
         all_vertexes_src()[i].hash = hash(ev) + st_hash_part;
         all_vertexes_src()[i].name = name<factory>(ev);
         all_vertexes_src()[i].group = decltype(+s)::own_hash();
-        all_vertexes_src()[i].is_event = true;
+        all_vertexes_src()[i].event_hash = hash(ev);
         return false;
       });
       return false;
@@ -216,4 +267,5 @@ extern "C" void main_function() {
   });
 
   js_callback(41);
+  clear_states();
 }
