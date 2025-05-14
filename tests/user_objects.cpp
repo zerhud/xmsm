@@ -96,5 +96,65 @@ static_assert( [] {
   return (s.find(1)->val1==1) + 2*(s.find(1)->val2==2);
 }() == 3 );
 
+struct ts_tag {
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_qtrans<state<0>, state<1>>(f, allow_move(f))
+      , mk_trans<state<0>, state<2>, event<2>>(f)
+      , mk_trans<state<0>, state<2>, event<2>>(f)
+      , mk_trans<state<0>, state<3>, event<3>>(f)
+    );
+  }
+};
+
+struct tag1 {}; struct tag2 {};
+struct ts_tag1_1 : ts_tag, tag1 {};
+struct ts_tag1_2 : ts_tag, tag1 {};
+struct ts_tag1_3 : ts_tag, tag1 {};
+struct ts_tag2_1 : ts_tag, tag2 {};
+struct ts_tag2_2 : ts_tag, tag2 {};
+struct ts_tag2_m : tag2 {
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_multi_sm_description(f
+      , mk_trans<state<0>, state<1>, event<701>>(f)
+      , mk_trans<state<1>, state<2>, event<702>>(f)
+      , finish_state<state<2>>(f), start_event<event<700>>(f)
+    );
+  }
+};
+struct ts_tag_move {
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<state<0>, state<1>, event<1>>(f, move_to<tag1, state<1>, state<100>>(f))
+      , mk_trans<state<0>, state<3>>(f, when(f, (in<tag2, state<3>>(f) && affected<tag2>(f)) || cnt_in<tag2, 1, state<1>>(f)))
+    );
+  }
+};
+
+using mtag = xmsm::machine<factory, ts_tag1_1, ts_tag1_2, ts_tag1_3, ts_tag2_1, ts_tag2_2, ts_tag_move, ts_tag2_m>;
+static_assert( [] {
+  mtag m{factory{}};
+  m.on(event<1>{});
+  constexpr bool tracking_match = decltype(get<ts_tag_move>(m.scenarios).move_to_tracker)::debug_tracking_scenarios() == xmsm::type_list<ts_tag1_1, ts_tag1_2, ts_tag1_3>{};
+  return m.in_state<ts_tag1_1, state<1>>() + 2*tracking_match + 4*m.in_state<ts_tag1_2, state<1>>() + 8*m.in_state<ts_tag2_1, state<0>>();
+}() == 15, "can move few scenarios using tag (base class)" );
+static_assert( [] {
+  mtag m{factory{}};
+  m.on(event<2>{});
+  m.on(event<1>{});
+  return m.in_state<ts_tag1_1, state<2>>() + 2*m.in_state<ts_tag_move, state<100>>() + 4*m.in_state<ts_tag2_1, state<2>>();
+}() == 7, "if fail moving one of scenarios by tag the fail state is active" );
+static_assert( [] {
+  mtag m{factory{}}; m.on(event<3>{});
+  return m.in_state<ts_tag_move, state<3>>();
+}(), "condition for single scenarios works with tags" );
+static_assert( [] {
+  mtag m{factory{}}; m.on(event<700>{}); m.on(event<701>{});
+  return m.in_state<ts_tag_move, state<3>>();
+}(), "condition for multi scenarios works with tags" );
+static_assert( [] {
+  mtag m{factory{}}; return m.in_state_count<tag1, state<0>>();
+}() == 3 );
+
 int main(int,char**){
 }

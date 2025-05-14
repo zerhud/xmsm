@@ -21,8 +21,8 @@ template<typename factory> constexpr auto factory_entity() {
 
 template<typename type, typename fnc_type> struct pointer_selector {
   fnc_type fnc;
-  template<typename factory, typename user_type> constexpr pointer_selector& operator^(scenario<factory, type, user_type>& s) { fnc(s); return *this; }
-  template<typename factory, typename fail, typename user_type> constexpr pointer_selector& operator^(scenario<factory, fail, user_type>&) { return *this; }
+  template<typename factory, typename user_type, typename olist> constexpr pointer_selector& operator^(scenario<factory, type, user_type, olist>& s) { fnc(s); return *this; }
+  template<typename factory, typename fail, typename user_type, typename olist> constexpr pointer_selector& operator^(scenario<factory, fail, user_type, olist>&) { return *this; }
 };
 template<typename type> constexpr auto cur_state_hash_from_set(auto&... scenarios){
   decltype(hash(type_c<type>)) ret{};

@@ -18,10 +18,10 @@ template<typename factory> struct scenario_id_def_generator {
   constexpr auto operator()(const auto&){ return ++last_id; }
 };
 
-template<typename factory, typename object, typename user_type>
+template<typename factory, typename object, typename user_type, typename scenarios_list>
 struct multi_scenario : basic_scenario<factory, object> {
   using base = basic_scenario<factory, object>;
-  using single_scenario_type = single_scenario<factory, object, user_type>;
+  using single_scenario_type = single_scenario<factory, object, user_type, scenarios_list>;
   using info = base::info;
 
   constexpr static auto finish_state() {

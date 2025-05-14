@@ -70,7 +70,7 @@ template<typename type> constexpr auto change_type(const factory&, const auto& a
 using machine = xmsm::machine<factory, ts_with_queue, ts_with_move_to, ts_with_cond, ts_multi>;
 
 static_assert( size(machine{factory{}}.scenarios)==4 );
-static_assert( std::is_same_v<std::decay_t<decltype(get<0>(machine{factory{}}.scenarios))>, xmsm::scenario<factory, ts_with_queue, ts_with_queue_user>> );
+static_assert( std::is_same_v<std::decay_t<decltype(get<0>(machine{factory{}}.scenarios))>, xmsm::scenario<factory, ts_with_queue, ts_with_queue_user, xmsm::type_list<ts_with_queue, ts_with_move_to, ts_with_cond, ts_multi>>> );
 static_assert( std::is_same_v<std::decay_t<decltype(get<0>(machine{factory{}}))>, ts_with_queue_user> );
 static_assert( std::is_same_v<std::decay_t<decltype(get<ts_with_queue>(machine{factory{}}))>, ts_with_queue_user> );
 static_assert( [] {

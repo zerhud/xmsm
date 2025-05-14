@@ -27,8 +27,8 @@ struct machine {
         else return base_type{f}.ch_type(t);
       }(t);
       if constexpr(base_type::is_remote() || base_type::is_multi())
-        return scenario<factory, decltype(+t), decltype(+type)>{f};
-      else return scenario<factory, decltype(+t), decltype(+type)>{f, create_object<decltype(+type)>(f)};
+        return scenario<factory, decltype(+t), decltype(+type), type_list<scenarios_t...>>{f};
+      else return scenario<factory, decltype(+t), decltype(+type), type_list<scenarios_t...>>{f, create_object<decltype(+type)>(f)};
     };
     return mk_tuple(mk(type_c<scenarios_t>)...);
   }
@@ -112,9 +112,12 @@ struct machine {
     else return s.count();
   });}
   template<typename sc, typename st> constexpr unsigned int in_state_count(this auto& m) {
-    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<sc>, s...);});
-    if constexpr(!get<ind>(m.scenarios).is_multi()) return get<ind>(m.scenarios).template in_state<st>();
-    else return get<ind>(m.scenarios).template count_in<st>();
+    constexpr auto count = [](const auto& s) -> int {
+      if constexpr(!(type_c<sc> <= s.origin())) return 0;
+      else if constexpr(!s.is_multi()) return s.template in_state<st>();
+      else return s.template count_in<st>();
+    };
+    return unpack(m.scenarios, [&](auto&&...s) { return (0+...+count(s)); });
   }
   template<typename scenario, typename state> constexpr bool in_state() const {
     return unpack(scenarios, [](auto&&... s){return (0+...+s.template in_state_by_scenario<scenario,state>());});

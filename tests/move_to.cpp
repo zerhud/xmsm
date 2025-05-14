@@ -67,7 +67,7 @@ static_assert( [] {
   return s.in_state<state<2>>() + 2*s_q.in_state<state<1>>() + 4*s_t.in_state<state<2>>();
 }() == 7, "can handle chain of transitions" );
 static_assert( [] {
-  auto tracker = xmsm::mk_tracker<factory,ts_with_queue>(xmsm::basic_scenario<factory, ts_with_move_to>::all_trans_info());
+  auto tracker = xmsm::mk_tracker<factory>(xmsm::basic_scenario<factory, ts_with_move_to>::all_trans_info(), xmsm::type_list<ts_with_queue>{});
   if (tracker.is_active()) throw __LINE__;
   auto [s_q, s, s_t] = mk_s_queue();
   tracker.update(&s, event<0>{}, s_q, s_t);

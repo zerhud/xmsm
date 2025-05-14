@@ -50,6 +50,7 @@ struct state_queue_tracker {
 
   constexpr state_queue_tracker() { deactivate(); }
   consteval static bool is_valid() {return size(list{})>0;}
+  constexpr static auto debug_tracking_scenario() { return type_c<scenario>; }
 
   template<typename tgt_sc, typename tgt_st, typename fail_st> constexpr state_queue_tracker* search()
   requires(type_c<tgt_sc> == type_c<scenario> && type_c<tgt_st> == type_c<target_state> && type_c<fail_st> == type_c<fail_state>){ return this; }
@@ -162,8 +163,8 @@ struct state_queue_tracker_multi {
     if (is_active()) return;
     info.calculate(ms);
   }
-  template<typename other_scenario, typename user_type> constexpr static bool update(const xmsm::scenario<factory, other_scenario, user_type>&) { return false; }
-  template<typename user_type> constexpr bool update(const xmsm::scenario<factory, scenario, user_type>& s) {
+  template<typename other_scenario, typename user_type, typename olist> constexpr static bool update(const xmsm::scenario<factory, other_scenario, user_type, olist>&) { return false; }
+  template<typename user_type, typename olist> constexpr bool update(const xmsm::scenario<factory, scenario, user_type, olist>& s) {
     report_info cur_info{};
     cur_info.calculate(s);
     auto ret = cur_info.sum > 0 && cur_info <= this->info;
@@ -205,6 +206,9 @@ template<typename factory,typename base> struct final_tracker : base {
     if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi()) self->activate(utils::search_scenario(mt().scenario, scenarios...));
     else self->activate( utils::cur_state_hash_from_set<decltype(+mt().scenario)>(scenarios...) );
   }}
+  constexpr static auto debug_tracking_scenarios() {
+    return unpack(bases{}, [](auto...b){return (type_list{} << ... << decltype(+b)::debug_tracking_scenario());});
+  }
 };
 
 struct fake_state_queue_tracker {
@@ -213,19 +217,29 @@ struct fake_state_queue_tracker {
   constexpr static void activate(auto mt, auto&&... scenarios) {}
 };
 
-template<typename factory> constexpr auto mk_tracker_base_class(auto mt) {
-  constexpr auto single = [](auto mt){ return mk_allow_queue_st(basic_scenario<factory, decltype(+mt().scenario)>::all_trans_info(), mt().state); };
-  if constexpr(basic_scenario<factory,decltype(+mt().scenario)>::is_multi())
-    return type_c<state_queue_tracker_multi<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>>;
-  else return type_c<state_queue_tracker<factory, decltype(single(mt)), decltype(+mt().scenario), decltype(+mt().state), decltype(+mt().fail_state)>>;
+template<typename factory> constexpr auto mk_tracker_base_class(auto mt, auto others_list) {
+  constexpr auto single = [](auto mt, auto sc){ return mk_allow_queue_st(basic_scenario<factory, decltype(+sc)>::all_trans_info(), mt().state); };
+  constexpr auto mk_base = [](auto mt, auto sc) {
+    if constexpr(basic_scenario<factory,decltype(+sc)>::is_multi())
+      return type_c<state_queue_tracker_multi<factory, decltype(single(mt, sc)), decltype(+sc), decltype(+mt().state), decltype(+mt().fail_state)>>;
+    else return type_c<state_queue_tracker<factory, decltype(single(mt, sc)), decltype(+sc), decltype(+mt().state), decltype(+mt().fail_state)>>;
+  };
+  auto ret = unpack(others_list, [&](auto... scenarios) {
+    return (type_list{} << ... << [&](auto scenario) {
+      if constexpr(mt().scenario <= scenario) return mk_base(mt, scenario);
+      else return type_c<>;
+    }(scenarios));
+  });
+  if constexpr(size(ret)==0) return mk_base(mt, mt().scenario);
+  else return ret;
 }
 template<typename factory, typename... others>
-constexpr auto mk_tracker(auto target_info) {
+constexpr auto mk_tracker(auto target_info, type_list<others...>) {
   constexpr auto move_to_list = unpack(target_info, [](auto... i){return (type_list{} << ... << decltype(+i)::mod_move_to);});
   if constexpr(size(move_to_list)==0) return fake_state_queue_tracker{};
   else {
     constexpr auto base_class_list = unpack(move_to_list, [](auto... mt) {
-      auto list = (type_list{}<<...<<mk_tracker_base_class<factory>(mt));
+      auto list = (type_list{}<<...<<mk_tracker_base_class<factory>(mt, type_list<others...>{}));
       return filter(list, [](auto t){return decltype(+t)::is_valid();});
     });
     constexpr auto tracker = unpack(base_class_list, [&](auto... t) {

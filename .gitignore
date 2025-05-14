@@ -37,3 +37,4 @@
 clion_build/*
 make_build/*
 tmp/*
+vis/work.hpp

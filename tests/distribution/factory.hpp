@@ -121,6 +121,7 @@ struct ts_sep_e5 {
   }
 };
 
+using scenarios_list = xmsm::type_list<ts_no_entity, ts_queue_e2, ts_when_e2, ts_multi_e1, ts_multi_e2, ts_multi_e2_2, ts_e3, ts_sep_e4, ts_sep_e5>;
 template<typename factory> using machine = xmsm::machine<factory, ts_no_entity, ts_queue_e2, ts_when_e2, ts_multi_e1, ts_multi_e2, ts_multi_e2_2, ts_e3, ts_sep_e4, ts_sep_e5>;
 using machine1 = machine<factory_default>;
 using machine2 = machine<factory_e2>;

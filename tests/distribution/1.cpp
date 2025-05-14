@@ -27,7 +27,7 @@ static_assert( machine1{factory_default{}}.is_remote<ts_queue_e2>() );
 static_assert( !machine1{factory_default{}}.is_remote<ts_no_entity>() );
 static_assert( !machine2{factory_e2{}}.is_remote<ts_queue_e2>() );
 static_assert( machine2{factory_e2{}}.is_remote<ts_no_entity>() );
-static_assert( [] { machine1 m1{factory_default{}}; return std::is_same_v<decltype(get<ts_multi_e1>(m1.scenarios)), xmsm::scenario<factory_default, ts_multi_e1, ts_multi_e1>&>; }(), "get by scenario works" );
+static_assert( [] { machine1 m1{factory_default{}}; return std::is_same_v<decltype(get<ts_multi_e1>(m1.scenarios)), xmsm::scenario<factory_default, ts_multi_e1, ts_multi_e1, scenarios_list>&>; }(), "get by scenario works" );
 
 static_assert( [] {
   auto [m1,m2,m3,m4,m5] = mk_m(); connect(m1,m2,m3,m4,m5);

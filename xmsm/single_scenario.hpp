@@ -22,7 +22,7 @@ struct stack_frame {
 
 struct fake_stack{ constexpr explicit fake_stack(const auto&){} };
 
-template<typename factory, typename object, typename user_type=object>
+template<typename factory, typename object, typename user_type=object, typename others_list=type_list<>>
 struct single_scenario : basic_scenario<factory, object> {
   enum trans_check_result { done=1, move_to_fail=2, only_if=4 };
   using base = basic_scenario<factory, object>;
@@ -66,10 +66,10 @@ struct single_scenario : basic_scenario<factory, object> {
   [[no_unique_address]] decltype(mk_stack_type(details::declval<factory>())) stack;
   scenario_state _own_state : 7 {scenario_state::ready};
   bool synced  : 1 {true};
-  [[no_unique_address]] decltype(mk_tracker<factory>(all_trans_info())) move_to_tracker;
+  [[no_unique_address]] decltype(mk_tracker<factory>(all_trans_info(), others_list{})) move_to_tracker;
 
   constexpr explicit single_scenario(factory f) : single_scenario((factory&&)(f), user_type{}) {}
-  constexpr explicit single_scenario(factory f, user_type uo) : base((factory&&)(f)), obj((user_type&&)(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info())) {}
+  constexpr explicit single_scenario(factory f, user_type uo) : base((factory&&)(f)), obj((user_type&&)(uo)), state(mk_states_type(this->f)), stack(mk_stack_type(this->f)), move_to_tracker(mk_tracker<factory>(all_trans_info(), others_list{})) {}
 
   constexpr bool is_synced() const {return synced;}
   constexpr scenario_state own_state() const { return this->_own_state; }
@@ -138,7 +138,7 @@ private:
   template<typename trans_info> constexpr bool handle_try_move_to(const auto& e, auto&&... scenarios) {
     foreach(trans_info::mod_try_move_to, [&](auto mt) {
       ([&](auto& s) {
-        bool f = s.own_hash() == hash(mt().scenario);
+        bool f = s.own_hash() == hash(mt().scenario); //TODO: we cannot use base class as target to pick up a derived class
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mt().state);
         if (f) size(targets)==0 || unpack(targets, [&](auto... tgts){return s.template move_to<decltype(+tgts)...>(e, scenarios...);});
       }(scenarios),...);
@@ -151,10 +151,10 @@ private:
       constexpr auto mod = mt();
       bool fail = false;
       move_to_tracker.activate(mt, scenarios...);
-      const bool found = (false || ... || [&](auto& s) {
-        bool f = s.own_hash() == hash(mod.scenario);
+      const int found = (0 + ... + [&](auto& s) {
+        bool f = mod.scenario <= s.origin();
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
-        if (f) fail = size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);});
+        if (f) fail |= size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);});
         return f;
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);

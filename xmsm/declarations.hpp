@@ -14,6 +14,6 @@ enum class sync_command{ sync, move_to, move_to_response, sync_multi, move_to_re
 enum class scenario_state { ready, broken, fired };
 
 template<typename factory, typename object> struct basic_scenario ;
-template<typename, typename, typename> struct scenario;
+template<typename, typename, typename, typename> struct scenario;
 
 }

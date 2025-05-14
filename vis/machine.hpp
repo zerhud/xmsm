@@ -41,6 +41,29 @@ struct ts_with_stack {
   }
 };
 
+struct taskbar_desktop {
+  struct nothing {};
+  struct taskbar_pending {};
+  struct desktop_pending {};
+  struct desktop {};
+  struct taskbar_only {};
+  struct all_hidden {};
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_qtrans<nothing, taskbar_pending>(f, allow_move(f))
+      , mk_qtrans<taskbar_pending, desktop_pending>(f, allow_move(f))
+      , mk_qtrans<desktop_pending, desktop>(f)
+
+      , mk_qtrans<desktop, taskbar_only>(f)
+      , mk_qtrans<taskbar_only, desktop>(f)
+      , mk_qtrans<taskbar_only, all_hidden>(f)
+
+      , mk_qtrans<all_hidden, taskbar_only>(f)
+      , mk_qtrans<all_hidden, desktop>(f)
+    );
+  }
+};
+
 template<typename factory> using machine = xmsm::machine<factory, ts1, ts_with_move_to, ts_with_stack>;
 
 }

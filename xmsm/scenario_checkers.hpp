@@ -26,7 +26,7 @@ template<typename sc, typename... st> struct in : basic {
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
     auto cur = s.cur_state_hash();
-    if constexpr(scenario != type_dc<obj>) return false;
+    if constexpr(!(scenario <= type_dc<obj>)) return false;
     else return unpack(states, [&](auto... i){ return (false || ... || (hash(i)==cur)); });
   }
   constexpr static auto list_scenarios() { return type_list<sc>{}; }
@@ -49,7 +49,7 @@ template<typename sc, auto cnt, typename... st> struct count_in : basic {
 
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
-    if constexpr(type_dc<obj> != type_c<sc>) return false;
+    if constexpr(!(type_c<sc> <= type_dc<obj>)) return false;
     else if constexpr(!s.is_multi()) return in<sc, st...>::check(s);
     else return cnt <= s.template count_in<st...>();
   }
@@ -59,7 +59,7 @@ template<typename sc, auto req_st> struct in_own_state : basic {
   constexpr static auto scenario = type_c<sc>;
   constexpr bool operator()(auto&&... s) const { return (false || ... || check(s)); }
   template<typename factory, typename obj, typename... tail> constexpr static bool check(const xmsm::scenario<factory, obj, tail...>& s) {
-    if constexpr(type_dc<obj> != type_c<sc>) return false;
+    if constexpr(!(type_c<sc> <= type_dc<obj>)) return false;
     else return s.own_state() == req_st;
   }
   constexpr static auto list_scenarios() { return type_list<sc>{}; }

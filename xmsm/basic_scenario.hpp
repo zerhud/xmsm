@@ -52,6 +52,7 @@ template<typename factory, typename object> struct basic_scenario {
   struct multi_sm_indicator;
   factory f;
 
+  constexpr static auto origin() { return type_c<object>; }
   constexpr static auto own_hash() { return hash(type_c<object>); }
   constexpr static auto own_name() { return name<factory>(type_c<object>); }
 
