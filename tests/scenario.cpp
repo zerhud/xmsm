@@ -283,11 +283,25 @@ struct ts_with_move_to_deep {
     );
   }
 };
+struct ts_with_queue_cicle {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f, mk_qtrans<state<-2>, state<-1>>(f), mk_qtrans<state<-1>, state<0>>(f), mk_qtrans<state<0>, state<1>>(f), mk_qtrans<state<1>, state<0>>(f) );
+  }
+};
+struct ts_with_queue_double_tail {
+  static auto describe_sm(const auto& f) {
+    return mk_sm_description(f , mk_qtrans<state<0>, state<1>>(f), mk_qtrans<state<1>, state<2>>(f), mk_qtrans<state<-1>, state<1>>(f) );
+  }
+};
 constexpr auto mk_s_queue() {struct{xmsm::scenario<factory, ts_with_queue> q{factory{}}; xmsm::scenario<factory, ts_with_move_to> m{factory{}};}ret; return ret; }
 static_assert( mk_allow_queue_st(xmsm::scenario<factory, ts_with_queue>{factory{}}.all_trans_info(), xmsm::type_c<state<2>>) == xmsm::type_list<
   xmsm::type_list<tests::state<0>, tests::state<1>, tests::state<2> >,
   xmsm::type_list<tests::state<4>, tests::state<3>, tests::state<2> >,
   xmsm::type_list<tests::state<6>, tests::state<5>, tests::state<3>, tests::state<2> > >{} );
+static_assert( mk_allow_queue_st(xmsm::basic_scenario<factory, ts_with_queue_cicle>::all_trans_info(), xmsm::type_c<state<1>>)
+  == xmsm::type_list<xmsm::type_list<state<-2>, state<-1>, state<0>, state<1>>, xmsm::type_list<state<0>, state<1>>>{} );
+static_assert( mk_allow_queue_st(xmsm::basic_scenario<factory, ts_with_queue_double_tail>::all_trans_info(), xmsm::type_c<state<2>>)
+  == xmsm::type_list<xmsm::type_list<state<0>, state<1>, state<2>>, xmsm::type_list<state<-1>, state<1>, state<2>>>{} );
 static_assert( [] { xmsm::scenario<factory, ts_with_move_to> s{factory{}}; s.on(event<1>{}); return s.in_state<state<100>>(); }(), "fail if scenario are not present" );
 static_assert( [] {
   auto [s_q, s] = mk_s_queue();

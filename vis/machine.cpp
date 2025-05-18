@@ -92,7 +92,7 @@ template<typename... types> struct variant {
     cur = ind;
   }
   constexpr auto index() const { return cur; }
-  template<typename type> constexpr auto& emplace(auto&&... args) {
+  template<typename type> constexpr type& emplace(auto&&... args) {
     static_assert( ind_of<type>() >= 0 );
     this->visit([]<typename t>(t&v){v.~t();});
     auto ret = new(&storage)type(static_cast<decltype(args)&&>(args)...);

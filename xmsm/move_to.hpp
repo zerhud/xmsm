@@ -17,22 +17,26 @@ struct allow_queue;
 namespace move_to_helpers {
 template<typename tt> constexpr auto trans_info_to(auto tinfo, _type_c<tt>) { return filter(tinfo, [](auto i){return decltype(+i)::to == type_c<tt>;}); }
 template<typename tt> constexpr auto filter_by_target(auto tinfo, _type_c<tt>, auto tail) {
-  auto selected = trans_info_to<tt>(tinfo, type_c<tt>);
+  auto selected = trans_info_to(tinfo, type_c<tt>);
   if constexpr (size(selected)==0) return type_list<decltype(tail)>{};
   else return unpack(selected, [&](auto... s) {
-    return type_list<decltype(type_list<decltype(+decltype(+s)::from)>{} << tail)...>{};
+    return type_list<decltype([&] {
+      if constexpr(contains(tail, decltype(+s)::from)) return tail;
+      else return type_list{} << decltype(+s)::from << tail;
+    }())...>{};
   });
 }
 constexpr auto filter_by_target(auto tinfo, auto path) {
-  auto iter = filter_by_target(tinfo, first(path), path);
-  if constexpr(size(iter)==1 && first(iter)()==path) return iter;
-  else return unpack(iter, [&](auto... pathes){return (type_list{} << ... << [&](auto cur) {
-    return filter_by_target(tinfo, cur);
+  auto iteration = filter_by_target(tinfo, first(path), path);
+  if constexpr(size(iteration)==1 && first(iteration)()==path) return iteration;
+  else return unpack(iteration, [&](auto... pathes){return (type_list{} << ... << [&](auto cur) {
+    if constexpr(cur==path) return type_list<decltype(path)>{};
+    else return filter_by_target(tinfo, cur);
   }(pathes()));});
 }
 }
 
-template<typename target_t> constexpr auto mk_allow_queue_st(auto tinfo, _type_c<target_t> target) {
+template<typename target_t> constexpr auto mk_allow_queue_st(auto tinfo, _type_c<target_t>) {
   constexpr auto list = filter(tinfo, [](auto i){return decltype(+i)::is_queue_allowed;});
   constexpr auto to_target = filter(list, [](auto i){return decltype(+i)::to == type_c<target_t>;});
   constexpr auto to_target_st = unpack(to_target, [](auto... t){return type_list<type_list<decltype(+decltype(+t)::to)>...>{};});
@@ -243,6 +247,7 @@ constexpr auto mk_tracker(auto target_info, type_list<others...>) {
       return filter(list, [](auto t){return decltype(+t)::is_valid();});
     });
     constexpr auto tracker = unpack(base_class_list, [&](auto... t) {
+      static_assert( sizeof...(t) > 0, "some of states in move_to are not present in requried scenario" );
       struct tracker : decltype(+t)... {
         using decltype(+t)::search...;
         using bases = type_list<decltype(+t)...>;
