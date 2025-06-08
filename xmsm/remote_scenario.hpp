@@ -57,8 +57,14 @@ template<typename factory, typename object, typename connector> struct remote_sc
     cur_state_index = index_of_by_hash(this->all_states(), cur_state_hash());
   }
   constexpr auto cur_state_hash() const { return cur_state; }
-  template<typename state> constexpr bool in_state() const requires (!base::is_multi()) {
-    return index_of(this->all_states(), type_c<state>) == cur_state_index;
+  template<typename state> constexpr bool in_state() const {
+    constexpr auto ind = index_of(base::all_states(), type_c<state>);
+    if constexpr(!base::is_multi()) return ind == cur_state_index;
+    else {
+      int ret = 0;
+      for (auto& st:multi_container.states) ret += st==ind;
+      return (ret>0) * (ret==multi_container.count());
+    }
   }
   constexpr auto count() const requires (base::is_multi()) { return multi_container.count(); }
   template<typename _st> constexpr auto count_in() const requires (base::is_multi()) {
@@ -95,5 +101,7 @@ private:
   scenario_state _own_state {scenario_state::ready};
   [[no_unique_address]] decltype(mk_multi_container(details::declval<factory>())) multi_container;
 };
+
+template<typename st, typename...tail> constexpr bool is_in_state(const remote_scenario<tail...>& s) { return s.template in_state<st>(); }
 
 }

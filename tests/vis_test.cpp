@@ -11,5 +11,5 @@
 
 int main(int,char**) {
   xmsm_vis::machine<tests::factory> m{tests::factory{}};
-  m.on(xmsm_vis::taskbar_app::crash{});
+  m.on(xmsm_vis::crash{});
 }

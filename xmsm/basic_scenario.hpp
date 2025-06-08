@@ -81,7 +81,7 @@ template<typename factory, typename object> struct basic_scenario {
   template<typename s, auto cnt, typename... st> friend constexpr auto cnt_in(const basic_scenario&){ return scenario_checker::count_in<s, cnt, st...>{}; }
   template<typename s> friend constexpr auto affected(const basic_scenario&){ return scenario_checker::in_own_state<s, scenario_state::fired>{}; }
   template<typename s> friend constexpr auto broken(const basic_scenario&){ return scenario_checker::in_own_state<s, scenario_state::broken>{}; }
-  template<typename e> friend constexpr auto stack_by_expr(const basic_scenario&, e) { return modificators::stack_by_expression<e>{}; }
+  template<modificators::check_expression e> friend constexpr auto stack_by_expr(const basic_scenario&, e) { return modificators::stack_by_expression<e>{}; }
   template<typename e> friend constexpr auto when(const basic_scenario&, e) { return modificators::when<e>{}; }
   template<typename e> friend constexpr auto only_if(const basic_scenario&, e) { return modificators::only_if<e>{}; }
   template<typename st, typename... _mods> friend constexpr auto to_state_mods(const basic_scenario&, _mods...) { return modificators::to_state_mods<st, _mods...>{}; }

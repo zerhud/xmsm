@@ -154,14 +154,14 @@ private:
       const int found = (0 + ... + [&](auto& s) {
         bool f = mod.scenario <= s.origin();
         constexpr auto targets = all_targets_for_move_to(s.all_trans_info(), mod.state);
-        if (f) fail |= size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);});
+        if (f) fail |= !is_in_state<decltype(+mod.state)>(s) && (size(targets)==0 || !unpack(targets, [&](auto... tgts){return s.template move_to_or_wait<decltype(+tgts)...>(e, scenarios...);}));
         return f;
       }(scenarios));
       if constexpr(requires{move_to_required_but_not_found(this->f, mod.scenario);}) if(!found) move_to_required_but_not_found(this->f, mod.scenario);
       if (fail || !found || !move_to_tracker.is_active()) {
         force_move_to<decltype(+mod.fail_state)>(e, scenarios...);
-        move_to_tracker.update(this, e, scenarios...);
       }
+      move_to_tracker.update(this, e, scenarios...);
       return !(!fail && found);
     });
   }
@@ -226,5 +226,7 @@ private:
     for (auto i=0;i<stack.size();++i) if (check(stack[i])) erase(this->f, stack, i--);
   }
 };
+
+template<typename st, typename... tail> constexpr bool is_in_state(const single_scenario<tail...>& s) { return s.template in_state<st>(); }
 
 }

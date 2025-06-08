@@ -149,4 +149,10 @@ private:
   }
 };
 
+template<typename st, typename... tail> constexpr bool is_in_state(const multi_scenario<tail...>& s) {
+  int st_cnt=0;
+  s.foreach_scenario([&](auto& s){ st_cnt += is_in_state<st>(s); });
+  return (st_cnt==s.count())*(st_cnt>0);
+}
+
 }

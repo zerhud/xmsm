@@ -6,7 +6,7 @@
  * or <http://www.gnu.org/licenses/> for details
  *************************************************************************/
 
-#include "factory.hpp"
+#include "../factory.hpp"
 
 template<auto v> using state = tests::state<v>;
 template<auto v> using event = tests::event<v>;
