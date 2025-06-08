@@ -14,7 +14,7 @@
 
       gcc_with_debinfo = pkgs.gcc14.cc.overrideAttrs(oldAttrs: { dontStrip=true; });
       stdenv_with_debinfo = pkgs.overrideCC pkgs.gcc14Stdenv gcc_with_debinfo;
-      der = pkgs.gcc14Stdenv.mkDerivation {
+      der = pkgs.gcc15Stdenv.mkDerivation {
         name = "xmsm";
         NIX_ENFORCE_NO_NATIVE = false;
         buildInputs = with pkgs;[ ];
