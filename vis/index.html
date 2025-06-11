@@ -80,6 +80,7 @@
             title: preTitle(instance.exports.all_vertexes_hash(i).toString())
           });
         }
+        console.log("states: ", instance.exports.all_vertexes_size());
         for(let i=0;i<instance.exports.all_edges_size();++i) {
           let l = new Uint8Array(instance.exports.memory.buffer, instance.exports.all_edges_event_name(i), instance.exports.all_edges_event_name_sz(i));
           let cur = instance.exports.all_edges_hash(i).toString();

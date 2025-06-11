@@ -236,7 +236,7 @@ extern "C" void main_function() {
     auto add_fnc = [i=-1,ei=-1](auto s, auto sl, auto el, auto tl)mutable{
       constexpr auto st_hash_part = (uint64_t)decltype(+s)::own_hash() << 32;
       foreach(tl, [&](auto t)mutable{ ++ei;
-        all_edges_src()[ei].hash = hash(t);
+        all_edges_src()[ei].hash = hash(t) + st_hash_part;
         all_edges_src()[ei].from = hash(t().from) + st_hash_part;
         all_edges_src()[ei].to = hash(t().to) + st_hash_part;
         all_edges_src()[ei].event = hash(t().event) + st_hash_part;
