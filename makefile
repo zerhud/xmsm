@@ -5,9 +5,13 @@ CLANG_UNWRAP := $(shell which -a clang++ | sed -n '2p')
 GCC_UNWRAP := $(shell which -a g++ | sed -n '2p')
 INCLUDES := -I. -I./absd -Ijiexpr -Iast_graph -Ivirtual_variant -Ijinja
 
+# Default installation prefix
+PREFIX ?= /usr/local
+INCLUDEDIR = $(PREFIX)/include
+
 tests_src := $(shell find . -ipath '*/tests/*.cpp' | sed 's/^..//g')
 
-.PHONY: all force_clang vis vis_build vb
+.PHONY: all force_clang vis vis_build vb install uninstall
 
 base = $(basename $(subst tests/,,$(1)))
 all: $(foreach src_file,$(tests_src),$(call base,$(src_file)))
@@ -69,3 +73,16 @@ vis_build: $(builddir)/vis.wasm $(builddir)/vis-network.min.js $(builddir)/index
 vb: vis_build
 vis: vis_build
 	cd $(builddir) && http-server -c1
+
+install:
+	@echo "Installing xmsm header files to $(DESTDIR)$(INCLUDEDIR)/"
+	@mkdir -p $(DESTDIR)$(INCLUDEDIR)/xmsm
+	@cp -r include/xmsm.hpp $(DESTDIR)$(INCLUDEDIR)/
+	@cp -r include/xmsm/* $(DESTDIR)$(INCLUDEDIR)/xmsm/
+	@echo "Installation complete."
+
+uninstall:
+	@echo "Removing xmsm header files from $(DESTDIR)$(INCLUDEDIR)/"
+	@rm -rf $(DESTDIR)$(INCLUDEDIR)/xmsm.hpp
+	@rm -rf $(DESTDIR)$(INCLUDEDIR)/xmsm
+	@echo "Uninstallation complete."
