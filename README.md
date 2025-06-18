@@ -24,26 +24,65 @@ extended meta finite state automaton
    ```bash
    git clone https://github.com/zerhud/xmsm.git
    ```
-1. Copy the header files from the `include` directory to a location accessible to your compiler (e.g., `/usr/local/include/` or your project):
+1. Use `make install` in root of the project or copy the header files from the `include` directory to a location accessible to your compiler (e.g., `/usr/local/include/` or your project):
    ```bash
-   cp -r include/xmsm.hpp /usr/local/include/
-   cp -r include/xmsm /usr/local/include/
+   cp xmsm.hpp /usr/local/include/
+   cp -r xmsm /usr/local/include/
    ```
 1. For Nix users: the repository contains `flake.nix` file, so you can use `nix develop` with it
 
-### Building tests
-1. Navigate to the repository root.
-2. Ensure `make` and a compiler (e.g., `g++`) are installed.
-3. Run `make`
+You can also compile tests. It requires `g++` and `clang++` with c++23 support. The `make` command will build all tests (for example `make -j$(nproc --all)`).
 
 ## Usage Guide
+To start using:
+- implement a factory. the factory is a simple class without data. it allows to separte realization from the idea
+- defining scenarios
+- declare machine with scenarios. the machine requires factory and scenarios
+  - `template<typename factory> usign machine = xmsm::machine<factory, scenario1, scenario2, scenario3>;` it allows to use machine with any other factory
+  - `using machine = xmsm::machine<implemented_factory, scenaro1, scenario2, scenario3>;` for use with concrete factory.
+ 
+### Implement a factory  
+The factory is a class with realiztion. For example with C++ standard library
+
+```c++
+struct factory {
+  using string_view = std::string_view; // will be removed soon
+};
+
+// variant to store states
+template<typename... types> constexpr auto mk_variant(const factory&) {
+  return std::variant<types...>{};
+}
+
+// containers and erase method for it (can to be implemented for each container separately)
+template<typename type> constexpr auto mk_vec(const factory&) { return std::vector<type>{}; }
+template<typename type> constexpr auto mk_list(const factory&) {
+  return std::list<type>{}; // this container should keep pointers after deletion
+}
+constexpr void erase(const factory&, auto& cnt, auto ind) {
+  cnt.erase(cnt.begin() + ind);
+}
+
+// mk_atomic allows to use xmsm with threads. it can to be implemented like this if only thread will be used.
+// this method requires only with multi scenario
+template<typename type> constexpr auto mk_atomic(const factory&) {
+  return type{};
+}
+
+// also the method can to be implemented to handle exceptions in state creation and switch events
+// or can to be omited. the method will be called from catch block, if exists.
+template<typename scenario, typename trans, typename next> constexpr void on_exception(const factory& f) {
+  throw;
+}
+```
+
 ### Defining Scenarios
-Scenario is a class with `static auto describe_sm(const auto& f)` method. The method returns machine description.
+Scenario is a class with `static auto describe_sm(const auto& f)` method. The method returns machine description. The parameter used for methods in ADL.
 
 For example:
 ```c++
 struct my_object {
-  int value{0}; // any data you want
+  int value{0}; // any data you want, or no fields at all
   static auto describe_sm(const auto& f) {
     return  mk_sm_description(f // the f object is used for ADL
       , mk_trans<state<0>, state<1>, event<0>>(f) // Transition from state<0> to state<1> on event<0>
@@ -56,10 +95,17 @@ struct my_object {
 
 the `mk_multi_sm_description` should be used for create a scenario with few sm inside.
 
+the `mk_trans` methods describe a transition and has few template parameters:
+1. state from (can to be void)
+2. state to
+3. event (optional)
+
+also it accepts any parameters - modifiers. some modifiers can to be passed to `mk_sm_description`.
+
 ### Available Transition Modifiers
 Transitions can be customized with modifiers:
 
-- `when`: Triggers a transition if a condition on other scenarios is true.
+- `when`: Triggers a transition if a condition on other scenarios is true. the condition will be describe later.
    ```c++
   mk_trans<state<0>, state<1>>(f, when(f, in<other_scenario1, state<1>>(f) && now_in<other_scenario2, state<2>>(f)))
    ```
@@ -77,12 +123,28 @@ Transitions can be customized with modifiers:
    ```c++
   mk_trans<state<0>, state<1>, event<0>>(f, stack_by_expr(f, now_in<other_scenario1, state<1>>(f)))
    ```
-- `move_to`: Attempts to move another scenario to a specified state. If it fails, move the scenario to fail state (or block the transition)
+- `move_to`: Attempts to move another scenario to a specified state. If it fails, move the scenario to fail state
+  - if the required state cannot to be achived right now the scenario will track a path to it state and if scenario makes "wront turn" the fail state will be setted.
+  - tansitions in other scenario have to be marked with `allow_queue` for to be trackable
+  - transitions in other scenario can to be marked with `allow_move`. the mark allows transition happen on `move_to`.
 - `try_move_to`: Same as `move_to`, but dose nothing on fail
 
-## Work with exception
-
-the method `on_exception<scenario, transaction, next_state>(const factory&)` will be called if exists from a catch block.
+there is also few modifiers for use in `mk_sm_description`:
+- `to_state_mods` for add some modifiers to all transitions where the to state is same as in the method
+- `from_state_mods` for add some modifiers to all transitions where the from state is same as in the method
+- `pick_def_state` allow to set default state for scenario. if there is no such method the first state will be used as default
+- `entity` allows to specify an entity for scenario. it allows to use the xmsm in different processes.
+- also few modifiers onyl for multi scenario
+  - `start_event` the scenario will start on the event
+  - `finish_state` the scenario will be destroied when achive this state
+ 
+### Available Conditions
+some modifiers works with conditions. any conditions can to be combined with logical operators - for example `in<scenario, state>(f) && affected<scenario>(f)`.
+- `in<scenario, state1, state2, state3>(f)` true when scenario in one of listed states
+- `affected<scenario1, scenario2>(f)` true when all of listed scenario was changed in current event
+- `cnt_in` for multi scenario, true when count of scenarios achives required state
+- `broken` true when scenario is in broken state - for example due exception
+- `now_in` is the same as `in` and `affected`
 
 # License
 xmsm is distributed under the [GNU Affero General Public License](https://www.gnu.org/licenses/). See the COPYING file in the repository root.
