@@ -41,6 +41,8 @@ To start using:
   - `template<typename factory> usign machine = xmsm::machine<factory, scenario1, scenario2, scenario3>;` it allows to use machine with any other factory
   - `using machine = xmsm::machine<implemented_factory, scenaro1, scenario2, scenario3>;` for use with concrete factory.
  
+There is example in [tests/example.cpp](tests/example.cpp)
+
 ### Implement a factory  
 The factory is a class with realiztion. For example with C++ standard library
 
@@ -75,6 +77,8 @@ template<typename scenario, typename trans, typename next> constexpr void on_exc
   throw;
 }
 ```
+
+Also, you can use [predefined factory](xmsm/std_factory.hpp) for std library
 
 ### Defining Scenarios
 Scenario is a class with `static auto describe_sm(const auto& f)` method. The method returns machine description. The parameter used for methods in ADL.
