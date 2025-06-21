@@ -57,7 +57,7 @@ struct single_scenario : basic_scenario<factory, object> {
         if constexpr(decltype(+i)::mod_stack_by_event==type_c<>) return type_list{};
         else return type_list{} + decltype(+decltype(+i)::mod_stack_by_event)::back_events;
       }(info))> ); });
-      return mk_list<stack_frame<decltype(mk_states_type(f)), unpack(list_of_lists_back_events, [](auto&&... i){ return max_size(decltype(+i){}...); }), decltype(+expr_variant_type)>>(f);
+      return mk_vec<stack_frame<decltype(mk_states_type(f)), unpack(list_of_lists_back_events, [](auto&&... i){ return max_size(decltype(+i){}...); }), decltype(+expr_variant_type)>>(f);
     }
   }
 

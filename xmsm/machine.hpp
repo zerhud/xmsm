@@ -111,6 +111,10 @@ struct machine {
     if constexpr(!s.is_multi()) return 0;
     else return s.count();
   });}
+  template<typename sc> constexpr friend auto stack_size(const machine& m) {
+    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<sc>, s...);});
+    return get<ind>(m.scenarios).stack_size();
+  }
   template<typename sc, typename st> constexpr unsigned int in_state_count(this auto& m) {
     constexpr auto count = [](const auto& s) -> int {
       if constexpr(!(type_c<sc> <= s.origin())) return 0;
