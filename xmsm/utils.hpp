@@ -57,7 +57,7 @@ template<auto ind, auto cur> constexpr auto& _search_scenario(auto& first, auto&
   else return _search_scenario<ind, cur+1>(tail...);
 }
 template<typename scenario> constexpr auto& search_scenario(_type_c<scenario>, auto&&... list) {
-#if defined(__cpp_pack_indexing)
+#if defined(__cpp_pack_indexing) && (__cplusplus > 202302L)
   return list...[index_of_scenario(type_c<scenario>, list...)];
 #else
   return _search_scenario<index_of_scenario(type_c<scenario>, list...), 0>(list...);
@@ -69,7 +69,7 @@ template<auto ind, auto cur> constexpr decltype(auto) _nth(auto&& first, auto&&.
 }
 template<auto ind> constexpr decltype(auto) nth(auto&&... args) {
   //TODO: GCC15: delete the function
-#if defined(__cpp_pack_indexing)
+#if defined(__cpp_pack_indexing) && (__cplusplus > 202302L)
   return static_cast<decltype(args...[ind])&&>(args...[ind]);
 #else
   return _nth<ind, 0>(static_cast<decltype(args)&&>(args)...);

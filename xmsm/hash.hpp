@@ -43,7 +43,11 @@ namespace xmsm::details { constexpr bool is_little_endian(){return true;} }
 
 namespace xmsm {
 
+#if __cplusplus > 202302L
 constexpr auto hash32(const void* src, int len, uint32_t seed) {
+#else
+constexpr auto hash32(const char* src, int len, uint32_t seed) {
+#endif
   // murmurhash from https://github.com/aappleby/smhasher/blob/0ff96f7835817a27d0487325b6c16033e2992eb5/src/MurmurHash2.cpp#L37
   const uint32_t m = 0x5bd1e995;
   const int r = 24;
