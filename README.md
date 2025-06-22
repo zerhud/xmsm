@@ -44,30 +44,37 @@ To start using:
 There is example in [tests/example.cpp](tests/example.cpp)
 
 ### Implement a factory  
-The factory is a class with realiztion. For example with C++ standard library
+The factory is a class with realisation. It allows user to separate type of dependencies and it's creation from inner logic.
+
+For example, with C++ standard library
 
 ```c++
 struct factory {
   using string_view = std::string_view; // will be removed soon
 };
 
-// variant to store states
-template<typename... types> constexpr auto mk_variant(const factory&) {
-  return std::variant<types...>{};
-}
+// tag dispatching is used for create objects. tags declared in xmsm/declarations.hpp
 
 // containers and erase method for it (can to be implemented for each container separately)
-template<typename type> constexpr auto mk_vec(const factory&) { return std::vector<type>{}; }
-template<typename type> constexpr auto mk_list(const factory&) {
-  return std::list<type>{}; // this container should keep pointers after deletion
+template<typename type> constexpr auto make(struct tags::vector, const std_factory&, _type_c<type>) {
+  return std::vector<type>{};
 }
-constexpr void erase(const factory&, auto& cnt, auto ind) {
+template<typename type> constexpr auto make(struct tags::list, const std_factory&, _type_c<type>) {
+  return std::list<type>{};
+}
+constexpr void erase(const std_factory&, auto& cnt, auto ind) {
   cnt.erase(cnt.begin() + ind);
 }
 
-// mk_atomic allows to use xmsm with threads. it can to be implemented like this if only thread will be used.
+// variant to store states
+template<typename... types> constexpr auto make(struct tags::variant, const std_factory&, type_list<types...>) {
+  return std::variant<types...>{};
+}
+
+// mk_atomic allows to use xmsm with threads.
+// it can to be implemented like this if only thread will be used, other way use std::atomic<type>{};
 // this method requires only with multi scenario
-template<typename type> constexpr auto mk_atomic(const factory&) {
+template<typename type> constexpr auto make(struct tags::atomic, const std_factory&, type_list<type>) {
   return type{};
 }
 

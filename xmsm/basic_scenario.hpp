@@ -48,7 +48,7 @@ constexpr auto add_mods(_type_c<trans_info<_from, _to, _event, _mods...>>, const
   return type_c<trans_info<_from, _to, _event, _mods..., adding...>>;
 }
 
-template<typename factory, typename object> struct basic_scenario {
+template<typename factory, typename object> struct basic_scenario : tags::user_object<object> {
   struct multi_sm_indicator;
   factory f;
 

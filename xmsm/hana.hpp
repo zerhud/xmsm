@@ -149,16 +149,16 @@ constexpr auto hash(auto type) { return hash32(type); }
 
 template<typename type, auto ind> struct tuple_value {
   type value;
-  template<auto i> constexpr type& g() requires(i==ind){ return value; }
-  template<auto i> constexpr const type& g() const requires(i==ind){ return value; }
   template<auto i> constexpr friend type& get(tuple_value& t) requires(i==ind){ return t.value; }
   template<auto i> constexpr friend const type& get(const tuple_value& t) requires(i==ind){ return t.value; }
   template<typename object, template<typename...>class holder, typename factory, typename... tail, auto _ind>
   constexpr friend type& get(tuple_value<holder<factory, object, tail...>, _ind>& t) requires (type_c<type> == type_c<holder<factory,object,tail...>>) { return t.value; }
+
+  template<typename base> constexpr friend type& by_base(tuple_value& t) requires(type_c<base> <= type_c<type>) { return t.value; }
+  template<typename base> constexpr friend const type& by_base(const tuple_value& t) requires(type_c<base> <= type_c<type>) { return t.value; }
 };
 
 template<typename... bases> struct tuple_storage : bases... {
-  using bases::g...;
   constexpr decltype(sizeof...(bases)) size() const { return sizeof...(bases); }
 #ifndef __clang__ //TODO: GCC15: bug in gcc: the tuple_value is ambiguous base class for some reason, and the friend get method is not available for typename template parameter
   template<typename object> constexpr friend auto& get(tuple_storage& t) { return obj_get<object, 0>(t); }
@@ -178,12 +178,10 @@ constexpr auto mk_tuple(auto&&... items) {
 
 constexpr auto size(const auto& obj) requires requires{obj.size();} { return obj.size(); }
 constexpr auto foreach(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
-  //return with_inds<size(obj)>([&]<auto...inds>{ return (false||...||fnc(get<inds>(obj))); });
-  return with_inds<size(obj)>([&]<auto...inds>{ return (false||...||fnc(obj.template g<inds>())); });
+  return with_inds<size(obj)>([&]<auto...inds>{ return (false||...||fnc(get<inds>(obj))); });
 }
 constexpr auto unpack(auto&& obj, auto&& fnc) requires requires{obj.size(); get<0>(obj);} {
-  //return with_inds<size(obj)>([&]<auto...inds>{ return fnc(get<inds>(obj)...); });
-  return with_inds<size(obj)>([&]<auto...inds>{ return fnc(obj.template g<inds>()...); });
+  return with_inds<size(obj)>([&]<auto...inds>{ return fnc(get<inds>(obj)...); });
 }
 constexpr auto unpack(auto&& obj, auto&& filter, auto&& fnc) {
   constexpr auto inds = with_inds<size(obj)>([&]<auto...inds>{

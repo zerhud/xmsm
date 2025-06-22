@@ -17,7 +17,7 @@ struct fake_multi_container {
 };
 template<typename factory> struct multi_scenario_info {
   using sz_type = decltype(sizeof(factory));
-  decltype(mk_vec<sz_type>(details::declval<factory>())) states;
+  decltype(inner_make(tags::vector, details::declval<factory>(), type_c<sz_type>)) states;
   constexpr auto count() const { return states.size(); }
 };
 
@@ -29,7 +29,7 @@ template<typename factory, typename object, typename connector> struct remote_sc
 
   constexpr static auto mk_multi_container(const auto& f) {
     if constexpr(!base::is_multi()) return fake_multi_container{};
-    else return multi_scenario_info<decltype(+type_dc<decltype(f)>)>{ mk_vec<decltype(sizeof(f))>(f) };
+    else return multi_scenario_info<decltype(+type_dc<decltype(f)>)>{ inner_make(tags::vector, f, type_c<decltype(sizeof(f))>) };
   }
 
   connector* con=nullptr;

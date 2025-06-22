@@ -20,15 +20,22 @@ struct std_factory {
   using string_view = std::string_view;
 };
 
-template<typename... types> constexpr auto mk_variant(const std_factory&) {
+template<typename type> constexpr auto make(struct tags::vector, const std_factory&, _type_c<type>) {
+  return std::vector<type>{};
+}
+template<typename type> constexpr auto make(struct tags::list, const std_factory&, _type_c<type>) {
+  return std::list<type>{};
+}
+
+template<typename... types> constexpr auto make(struct tags::variant, const std_factory&, type_list<types...>) {
   return std::variant<types...>{};
 }
-template<typename type> constexpr auto mk_vec(const std_factory&) { return std::vector<type>{}; }
-template<typename type> constexpr auto mk_list(const std_factory&) { return std::list<type>{}; }
 constexpr void erase(const std_factory&, auto& cnt, auto ind) {
   cnt.erase(cnt.begin() + ind);
 }
 
-template<typename type> constexpr auto mk_atomic(const std_factory&) { return std::atomic<type>{}; }
+template<typename type> constexpr auto make(struct tags::atomic, const std_factory&, type_list<type>) {
+  return std::atomic<type>{};
+}
 
 }

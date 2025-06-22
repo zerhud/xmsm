@@ -22,16 +22,19 @@ struct factory {
   using string_view = std::string_view;
 };
 
-template<typename... types> constexpr auto mk_variant(const factory&) {
-  return std::variant<types...>{};
+template<typename type> constexpr auto make(struct xmsm::tags::vector, const factory&, xmsm::_type_c<type>) {
+  return std::vector<type>{};
 }
-template<typename type> constexpr auto mk_vec(const factory&) { return std::vector<type>{}; }
-template<typename type> constexpr auto mk_list(const factory&) {
+template<typename type> constexpr auto make(struct xmsm::tags::list, const factory&, xmsm::_type_c<type>) {
   auto ret = std::vector<type>{};
-  ret.reserve(1000); // we can't use std::list in constexpr context, and the vector shouldn't move elements
+  ret.reserve(1000);
   return ret;
 }
-template<typename type> constexpr auto mk_atomic(const factory&) {
+template<typename... types> constexpr auto make(struct xmsm::tags::variant, const factory&, xmsm::type_list<types...>) {
+  return std::variant<types...>{};
+}
+
+template<typename type> constexpr auto make(struct xmsm::tags::atomic, const factory&, xmsm::_type_c<type>) {
   return type{};
 }
 constexpr void erase(const factory&, auto& cnt, auto ind) {
@@ -42,7 +45,8 @@ template<auto v> struct state { constexpr static auto val = v; int rt_val{0}; };
 template<auto v> struct event { constexpr static auto val = v; int rt_val{0}; };
 
 struct rt_factory : factory {};
-template<typename type> constexpr auto mk_list(const rt_factory&) { return std::list<type>{}; }
-template<typename type> constexpr auto mk_atomic(const rt_factory&) { return std::atomic<type>{}; }
+template<typename type> constexpr auto make(struct xmsm::tags::list, const rt_factory&, xmsm::_type_c<type>) {
+  return std::list<type>{};
+}
 
 }

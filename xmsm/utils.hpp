@@ -42,38 +42,11 @@ template<typename type> constexpr bool is_broken_from_set(auto&... scenarios) {
   (void)(pointer_selector<type, decltype(fnc)>{fnc} ^...^ scenarios);
   return ret;
 }
-template<typename scenario> consteval auto index_of_scenario(_type_c<scenario>, auto&&... list) {
-  auto check = []<typename factory, typename cur_scenario>(const basic_scenario<factory, cur_scenario>&){return type_c<scenario> == type_c<cur_scenario>;};
-  auto ind=0;
-  (void)(false||...||[&](const auto& cur) {
-    auto ups = !check(cur);
-    ind += ups;
-    return !ups;
-  }(list));
-  return ind;
-}
-template<auto ind, auto cur> constexpr auto& _search_scenario(auto& first, auto&... tail) {
-  if constexpr(ind==cur) return first;
-  else return _search_scenario<ind, cur+1>(tail...);
-}
-template<typename scenario> constexpr auto& search_scenario(_type_c<scenario>, auto&&... list) {
-#if defined(__cpp_pack_indexing) && (__cplusplus > 202302L)
-  return list...[index_of_scenario(type_c<scenario>, list...)];
-#else
-  return _search_scenario<index_of_scenario(type_c<scenario>, list...), 0>(list...);
-#endif
-}
-template<auto ind, auto cur> constexpr decltype(auto) _nth(auto&& first, auto&&... tail) {
-  if constexpr(ind==cur) return static_cast<decltype(first)&&>(first);
-  else return _nth<ind,cur+1>(static_cast<decltype(tail)&&>(tail)...);
-}
-template<auto ind> constexpr decltype(auto) nth(auto&&... args) {
-  //TODO: GCC15: delete the function
-#if defined(__cpp_pack_indexing) && (__cplusplus > 202302L)
-  return static_cast<decltype(args...[ind])&&>(args...[ind]);
-#else
-  return _nth<ind, 0>(static_cast<decltype(args)&&>(args)...);
-#endif
+template<typename scenario> constexpr void for_scenario(_type_c<scenario>, auto&& fnc, auto&&...list) {
+  (void)([&](auto& s, auto type) {
+    if constexpr(type_c<tags::user_object<scenario>> <= type) return fnc(s), true;
+    else return false;
+  }(list, type_dc<decltype(list)>) || ...);
 }
 
 }

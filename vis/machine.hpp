@@ -131,6 +131,26 @@ struct rerun_once {
   }
 };
 
-template<typename factory> using machine = xmsm::machine<factory, ts1, ts_with_move_to, ts_with_stack, taskbar_app, desktop_app, taskbar_desktop, rerun_once<taskbar_app>, rerun_once<desktop_app>>;
+struct app_manager {
+  struct wait_for_start{};
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+    );
+  }
+};
+
+template<typename app> struct show_and_move_app {
+  struct app_manager_pending {};
+  constexpr static auto describe_sm(const auto& f) {
+    return mk_sm_description(f
+      , mk_trans<app_not_run, app_manager_pending>(f)
+    );
+  }
+};
+
+template<typename factory> using machine = xmsm::machine<factory,
+ts1, ts_with_move_to, ts_with_stack,
+taskbar_app, desktop_app, taskbar_desktop, rerun_once<taskbar_app>, rerun_once<desktop_app>
+>;
 
 }

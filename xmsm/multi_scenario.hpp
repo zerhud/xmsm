@@ -13,7 +13,7 @@
 namespace xmsm {
 
 template<typename factory> struct scenario_id_def_generator {
-  using id_type = decltype(mk_atomic<uint64_t>(details::declval<factory>()));
+  using id_type = decltype(inner_make(tags::atomic, details::declval<factory>(), type_c<uint64_t>));
   id_type last_id{};
   constexpr auto operator()(const auto&){ return ++last_id; }
 };
@@ -51,8 +51,8 @@ struct multi_scenario : basic_scenario<factory, object> {
   constexpr static auto mk_scenarios_type(const auto& f) {
     using id_type = decltype(mk_user_id_generator(f))::id_type;
     using entry_type = scenario_entry<id_type, single_scenario_type>;
-    if constexpr(requires{mk_map<id_type,entry_type>(f);}) return mk_map<id_type,single_scenario_type>(f);
-    else return mk_list<entry_type>(f);
+    if constexpr(inner_make_check(tags::map, f, type_c<id_type>, type_c<entry_type>)) return inner_make(tags::map, f, type_c<id_type>, type_c<entry_type>);
+    else return inner_make(tags::list, f, type_c<entry_type>);
   }
 
   constexpr explicit multi_scenario(factory f) : base(details::move(f)), user_id_gen(mk_user_id_generator(this->f)), scenarios(mk_scenarios_type(this->f)) {}

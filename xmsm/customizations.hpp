@@ -12,6 +12,17 @@
 
 namespace xmsm {
 
+constexpr auto inner_make(auto tag, const auto& f, auto&&... args) {
+  if constexpr(requires{make(tag, f, (decltype(args)&&)args...);})
+    return make(tag, f, (decltype(args)&&)args...);
+  else
+    return make(tag, f);
+}
+
+constexpr bool inner_make_check(auto tag, const auto& f, auto&&... args) {
+  return requires{make(tag, f, (decltype(args)&&)args...);};
+}
+
 template<typename type> constexpr auto& variant_emplace(const auto& f, auto& v) {
   if constexpr(requires{emplace<type>(f, v);}) return emplace<type>(f, v);
   else if constexpr(requires{emplace<type>(v);}) return emplace<type>(v);

@@ -39,7 +39,7 @@ struct single_scenario : basic_scenario<factory, object> {
   constexpr static auto mk_states_type(const auto& f) {
     return unpack(all_states(), [&]([[maybe_unused]] auto... states) {
       static_assert( size(all_states()) == size(((type_list{}<<base::initial_state())<<...<<decltype(details::declval<base>().ch_type(states)){})), "all replaced type must to be unique" );
-      return mk_variant< decltype(+details::declval<base>().ch_type(states))... >(f);
+      return inner_make(tags::variant, f, type_list<decltype(+details::declval<base>().ch_type(states))...>{});
     });
   }
   constexpr static auto mk_stack_type(const auto& f) {
@@ -51,13 +51,13 @@ struct single_scenario : basic_scenario<factory, object> {
       }(info));});
       constexpr auto expr_variant_type = unpack(list_of_expressions, [](auto&&... expr) {
         if constexpr (sizeof...(expr)==0) return type_c<int>;
-        else return type_c<decltype(mk_variant< decltype(+expr)... >(details::declval<factory>()))>;
+        else return type_c<decltype( inner_make(tags::variant, f, type_list< decltype(+expr)... >{}) )>;
       });
       constexpr auto list_of_lists_back_events = unpack(all_trans_info(), [](auto&&... info){return (type_list{} + ... + type_c<decltype([](auto i) {
         if constexpr(decltype(+i)::mod_stack_by_event==type_c<>) return type_list{};
         else return type_list{} + decltype(+decltype(+i)::mod_stack_by_event)::back_events;
       }(info))> ); });
-      return mk_vec<stack_frame<decltype(mk_states_type(f)), unpack(list_of_lists_back_events, [](auto&&... i){ return max_size(decltype(+i){}...); }), decltype(+expr_variant_type)>>(f);
+      return inner_make(tags::state_stack, f, type_c<stack_frame<decltype(mk_states_type(f)), unpack(list_of_lists_back_events, [](auto&&... i){ return max_size(decltype(+i){}...); }), decltype(+expr_variant_type)>>);
     }
   }
 

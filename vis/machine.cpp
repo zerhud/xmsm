@@ -134,12 +134,15 @@ template<typename... types> struct variant {
 struct factory {
   using string_view = wstd::string_view;
 };
-template<typename... types> constexpr auto mk_variant(const factory&) {
+template<typename type> constexpr auto make(struct xmsm::tags::vector, const factory&, xmsm::_type_c<type>) {
+  return wstd::static_vector<type,100>{};
+}
+template<typename... types> constexpr auto make(struct xmsm::tags::variant, const factory&, xmsm::type_list<types...>) {
   return wstd::variant<types...>{};
 }
-template<typename type> constexpr auto mk_vec(const factory&) { return wstd::static_vector<type,100>{}; }
-template<typename type> constexpr auto mk_list(const factory& f) { return mk_vec<type>(f); }
-template<typename type> constexpr auto mk_atomic(const factory&) { return type{}; }
+template<typename type> constexpr auto make(struct xmsm::tags::atomic, const factory&, xmsm::_type_c<type>) {
+  return type{};
+}
 constexpr void erase(const factory&, auto& cnt, auto ind) {
   cnt.erase(ind);
 }

@@ -16,4 +16,18 @@ enum class scenario_state { ready, broken, fired };
 template<typename factory, typename object> struct basic_scenario ;
 template<typename, typename, typename, typename> struct scenario;
 
+namespace tags {
+
+template<typename> struct user_object {};
+
+constexpr struct vector {} vector{};
+constexpr struct list : vector {} list{};
+constexpr struct stack : vector {} stack{};
+constexpr struct state_stack : vector {} state_stack{};
+constexpr struct map {} map {};
+constexpr struct variant {} variant{};
+constexpr struct atomic {} atomic{};
+
+}
+
 }

@@ -104,16 +104,19 @@ struct machine {
     if (cmd==(int)sync_command::move_to_response_multi) return from_remote<sync_command::move_to_response_multi>(buf, sz);
     if constexpr(requires{wrong_sync_command(this->f, cmd, buf, sz);}) wrong_sync_command(this->f, cmd, buf, sz);
   }
-  template<typename sc> constexpr bool is_remote() const {return unpack(scenarios, [](auto&&... list){return utils::search_scenario(type_c<sc>, list...).is_remote();});}
-  template<typename sc> constexpr bool is_broken() const {return unpack(scenarios, [](auto&&... list){return utils::search_scenario(type_c<sc>, list...).own_state()==scenario_state::broken;});}
-  template<typename sc> constexpr auto scenarios_count() const { return unpack(scenarios, [](auto&&...list) {
-    auto& s = utils::search_scenario(type_c<sc>, list...);
+  template<typename sc> constexpr bool is_remote() const {
+    return by_base<tags::user_object<sc>>(scenarios).is_remote();
+  }
+  template<typename sc> constexpr bool is_broken() const {
+    return by_base<tags::user_object<sc>>(scenarios).own_state() == scenario_state::broken;
+  }
+  template<typename sc> constexpr auto scenarios_count() const {
+    auto& s = by_base<tags::user_object<sc>>(scenarios);
     if constexpr(!s.is_multi()) return 0;
     else return s.count();
-  });}
+  }
   template<typename sc> constexpr friend auto stack_size(const machine& m) {
-    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<sc>, s...);});
-    return get<ind>(m.scenarios).stack_size();
+    return by_base<tags::user_object<sc>>(m.scenarios).stack_size();
   }
   template<typename sc, typename st> constexpr unsigned int in_state_count(this auto& m) {
     constexpr auto count = [](const auto& s) -> int {
@@ -127,8 +130,7 @@ struct machine {
     return unpack(scenarios, [](auto&&... s){return (0+...+s.template in_state_by_scenario<scenario,state>());});
   }
   template<typename scenario> constexpr friend auto& get(machine& m) {
-    constexpr auto ind = unpack(m.scenarios, [](auto&&... s){return utils::index_of_scenario(type_c<scenario>, s...);});
-    return get<ind>(m.scenarios).obj;
+    return by_base<tags::user_object<scenario>>(m.scenarios).obj;
   }
   template<auto ind> constexpr friend auto& get(machine& m) {
     return get<ind>(m.scenarios).obj;
